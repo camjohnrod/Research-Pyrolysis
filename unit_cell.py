@@ -9,6 +9,7 @@ import dolfinx_mpc.utils
 from mpi4py import MPI
 import numpy as np
 from tqdm import tqdm
+from tqdm.auto import trange
 import matplotlib.pyplot as plt
 
 def solve_unit_cell(r_func):
@@ -347,7 +348,7 @@ def solve_unit_cell(r_func):
             # L_disp += ufl.inner(epsilon_sym(v_disp_current), P_thermal(mu, lam, alpha, delta_temp)) * dx(tag)
 
     petsc_options = {
-        "ksp_type": "cg",
+        "ksp_type": "gmres",
         "pc_type": "hypre",
         "pc_hypre_type": "boomeramg",
         "ksp_rtol": 1e-6,
@@ -361,8 +362,8 @@ def solve_unit_cell(r_func):
     if not os.path.exists("results"):
         os.makedirs("results")
 
-    xdmf = io.XDMFFile(domain.comm, "results/rve_h_functions.xdmf", "w")
-    xdmf.write_mesh(domain)
+    # xdmf = io.XDMFFile(domain.comm, "results/rve_h_functions.xdmf", "w")
+    # xdmf.write_mesh(domain)
 
 
     ## Define the displacement solver ##
@@ -401,7 +402,7 @@ def solve_unit_cell(r_func):
     # temp_bc = initial_temp + ramp_param * (final_temp - initial_temp)
     # u_temp_prev.interpolate(lambda x: np.full(x.shape[1], temp_bc, dtype=default_scalar_type))
 
-    for i in range(dim_load):
+    for i in trange(dim_load, colour="green", desc="Solve Unit Cell", position=1, leave=False, ncols=100):
         # print(f"Applying elementary load {i + 1}...")
         applied_eps.value = elementary_load[i]
         h_solve = problem_disp.solve()
@@ -413,11 +414,11 @@ def solve_unit_cell(r_func):
                 D_homogenized_matrix[i, j] += (1 / unit_cell_volume) * fem.assemble_scalar(fem.form(ufl.inner(P_tot(h_solve, stiffness_matrix), applied_eps_) * dx(tag)))
         
         # store the h solution for this load case
-        func_name = f"h_store_load_{i+1}"
-        globals()[func_name].x.array[:] = h_solve.x.array[:]
-        globals()[func_name].x.scatter_forward()
+        # func_name = f"h_store_load_{i+1}"
+        # globals()[func_name].x.array[:] = h_solve.x.array[:]
+        # globals()[func_name].x.scatter_forward()
         
-        xdmf.write_function(globals()[func_name])
+        # xdmf.write_function(globals()[func_name])
 
     # print(' ')
     # print("Homogenized D matrix:")

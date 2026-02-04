@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from   tqdm import tqdm
+from tqdm.auto import trange
 import os
 
 import dolfinx_mpc.utils
@@ -15,7 +16,10 @@ import ufl
 from unit_cell import solve_unit_cell
 
 
-##~~~ Inputs ~~~##
+##======================================##
+##=============== INPUTS ===============##
+##======================================##
+
 
 is_homogenize = True
 save_every = 2
@@ -35,7 +39,7 @@ cp_cer         = 750.0
 cp_fib         = 879
 
 alpha_mat      = 3.95e-6
-alpha_fib      = -0.64e-6
+alpha_fib      = alpha_mat #-0.64e-6
 
 rho_poly       = 1150.0    # updated
 rho_cer        = 2450.0    # updated
@@ -72,14 +76,20 @@ E_a            = 18216.0
 R_gas          = 8.3145
 
 
-##~~~ Define the mesh ~~~##
+##======================================##
+##========== DEFINE THE MESH ===========##
+##======================================##
+
 
 with XDMFFile(MPI.COMM_WORLD, "mesh/rve_3D.xdmf", "r") as xdmf:
     domain    = xdmf.read_mesh(name="Grid")
     cell_tags = xdmf.read_meshtags(domain, name="Grid")      
 
 
-##~~~ Define material properties ~~~##
+##======================================##
+##===== DEFINE MATERIAL PROPERTIES =====##
+##======================================##
+
 
 S_material_prop = fem.functionspace(domain, ("Lagrange", 1))
 
@@ -151,7 +161,10 @@ material_properties = {
 }
 
 
-##~~~ Define function spaces ~~~##
+##==================================================##
+##======= DEFINE TEMPERATURE FUNCTION SPACES =======##
+##==================================================##
+
 
 S_temp = fem.functionspace(domain, ("Lagrange", 1))
 S_disp = fem.functionspace(domain, ("Lagrange", 1, (domain.geometry.dim, )))
@@ -162,7 +175,10 @@ u_temp_prev.name = "Temperature"
 v_temp_current   = ufl.TestFunction(S_temp)
 
 
-##~~~ Calculate starting material properties ~~~##
+##==============================================##
+##=== CALCULATE STARTING MATERIAL PROPERTIES ===##
+##==============================================##
+
 
 update_matrix_material_properties(r_func.x.array[:], u_temp_prev.x.array[:])
 
@@ -170,7 +186,10 @@ if is_homogenize:
     stiffness_tensor_homogenized = solve_unit_cell(r_func.x.array[:])
 
 
-##~~~Define each boundary surface~~~##
+##======================================##
+##==== DEFINE EACH BOUNDARY SURFACE ====##
+##======================================##
+
 
 def left(x):
     return (np.isclose(x[0], 0))      # & (x[1] > 0) & (x[1] < width) & (x[2] > 0) & (x[2] < height))    
@@ -186,7 +205,10 @@ def top(x):
     return (np.isclose(x[2], height)) # & (x[0] > 0) & (x[0] < length) & (x[1] > 0) & (x[1] < width))
 
 
-##~~~ Boundary conditions ~~~##
+##======================================##
+##======== BOUNDARY CONDITIONS =========##
+##======================================##
+
 
 def fixed_temp_dof(x):
     return np.isclose(x[0], 0.0) | np.isclose(x[0], length) | np.isclose(x[1], 0.0) | np.isclose(x[1], width)
@@ -206,7 +228,10 @@ fixed_dofs_disp   = fem.locate_dofs_topological(S_disp, fdim_plane, fixed_facets
 bcs_disp = fem.dirichletbc(np.array([0, 0, 0], dtype=default_scalar_type), fixed_dofs_disp, S_disp)
 
 
-##~~~ Define temperature variational form ~~~##
+##===========================================##
+##=== DEFINE TEMPERATURE VARIATIONAL FORM ===##
+##===========================================##
+
 
 u_temp_prev.interpolate(lambda x: np.full(x.shape[1], initial_temp, dtype=default_scalar_type)) # is interpolate necessary
 
@@ -231,7 +256,10 @@ solver_temp.max_it = 50
 solver_temp.convergence_criterion = "incremental"
 
 
-##~~~ Define displacement function spaces ~~~##
+##===========================================##
+##=== DEFINE DISPLACEMENT FUNCTION SPACES ===##
+##===========================================##
+
 
 u_disp_current = ufl.TrialFunction(S_disp)
 v_disp_current = ufl.TestFunction(S_disp)
@@ -246,7 +274,10 @@ u_disp_current_store.name = "Displacement"
 u_disp_prev = fem.Function(S_disp)
 
 
-##~~~ Define the (linear) variational problem for displacement ~~~##
+##================================================================##
+##=== DEFINE THE (LINEAR) VARIATIONAL PROBLEM FOR DISPLACEMENT ===##
+##================================================================##
+
 
 dim_disp = domain.geometry.dim
 I = ufl.variable(ufl.Identity(dim_disp))
@@ -256,11 +287,11 @@ def get_stiffness_tensor(mu, lam):
         C = stiffness_tensor_homogenized
     else:
         C = ufl.as_matrix([[lam + 2 * mu,     lam,           lam,           0,              0,              0],
-                           [lam,           lam + 2 * mu,     lam,           0,              0,              0],
-                           [lam,               lam,       lam + 2 * mu,     0,              0,              0],
-                           [0,                 0,              0,          mu,              0,              0],
-                           [0,                 0,              0,           0,             mu,              0],
-                           [0,                 0,              0,           0,              0,             mu]])
+                            [lam,           lam + 2 * mu,     lam,           0,              0,              0],
+                            [lam,               lam,       lam + 2 * mu,     0,              0,              0],
+                            [0,                 0,              0,          mu,              0,              0],
+                            [0,                 0,              0,           0,             mu,              0],
+                            [0,                 0,              0,           0,              0,             mu]])
     return C
 
 def get_voigt(matrix):
@@ -301,13 +332,18 @@ for tag, (mu, lam, alpha, _, _, _) in material_properties.items():
     if tag == 2:
         a_disp += ufl.inner(epsilon_sym(v_disp_current), P_tot(u_disp_current, mu, lam)) * dx(tag)
         L_disp += ufl.inner(epsilon_sym(v_disp_current), P_thermal(mu, lam, alpha, delta_temp)) * dx(tag)
-        L_disp += ufl.inner(epsilon_sym(v_disp_current), P_volume(mu, lam, r_func)) * dx(tag)
+        # L_disp += ufl.inner(epsilon_sym(v_disp_current), P_volume(mu, lam, r_func)) * dx(tag)
     else:
         a_disp += ufl.inner(epsilon_sym(v_disp_current), P_tot(u_disp_current, mu, lam)) * dx(tag)
         L_disp += ufl.inner(epsilon_sym(v_disp_current), P_thermal(mu, lam, alpha, delta_temp)) * dx(tag)
 
+problem_disp = LinearProblem(a_disp, L_disp, bcs=[bcs_disp])
 
-##~~~ Define the projection for other variables ~~~##
+
+##=================================================##
+##=== DEFINE THE PROJECTION FOR OTHER VARIABLES ===##
+##=================================================##
+
 
 phi    = ufl.TrialFunction(S_constant)
 psi    = ufl.TestFunction(S_constant)
@@ -326,19 +362,13 @@ for tag, (mu, lam, alpha, _, _, _) in material_properties.items():
                                      6 * (tot_stress_expr[3]**2 + tot_stress_expr[4]**2 + tot_stress_expr[5]**2)))
     L_proj_von_mises += von_mises_expr * psi * dx(tag)
 
-petsc_options = {
-    "ksp_type": "cg",
-    "pc_type": "hypre",
-    "pc_hypre_type": "boomeramg",
-    "ksp_rtol": 1e-6,
-    "ksp_max_it": 1000,
-    "ksp_reuse_preconditioner": "true"
-}
-
-problem_stress_projection = LinearProblem(a_proj, L_proj_von_mises, bcs=[], petsc_options=petsc_options)
+problem_stress_projection = LinearProblem(a_proj, L_proj_von_mises, bcs=[])
 
 
-##~~~ Initialize the xdmf output file and initial (t0) outputs ~~~##
+##=================================================================##
+##=== INITIALIZE THE .xdmf OUTPUT FILE AND INITIAL (t0) OUTPUTS ===##
+##=================================================================##
+
 
 if not os.path.exists("results"):
     os.makedirs("results")
@@ -353,19 +383,17 @@ xdmf.write_function(r_func, t0)
 xdmf.write_function(E_func, t0)
 
 
-##~~~ Define the displacement solver ~~~##
+##======================================##
+##============ TIME STEPPING ===========##
+##======================================##
 
-problem_disp = LinearProblem(a_disp, L_disp, bcs=[bcs_disp], petsc_options=petsc_options)
-
-
-##~~~ Time stepping ~~~##
 
 r_middle_point_values = []
 temp_middle_point_values = []
 
 t = t0 + dt
 print('\n')
-for i in tqdm(range(num_timesteps), colour="red", desc="Time Stepping"):
+for i in trange(num_timesteps, colour="blue", desc="  Time Stepping", position=0, ncols=100):
     
     r_middle_point    = r_func.x.array[len(r_func.x.array) // 2]
     temp_middle_point = u_temp_prev.x.array[len(u_temp_prev.x.array) // 2]
@@ -415,7 +443,6 @@ for i in tqdm(range(num_timesteps), colour="red", desc="Time Stepping"):
 print('\n')
 
 xdmf.close()
-
 
 plt.figure()
 plt.plot(temp_middle_point_values, r_middle_point_values, marker='o', color='r')
