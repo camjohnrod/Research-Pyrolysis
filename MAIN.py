@@ -15,14 +15,17 @@ import ufl
 
 from unit_cell import solve_unit_cell
 
+print('\n')
+
 
 ##======================================##
 ##=============== INPUTS ===============##
 ##======================================##
 
 
-is_homogenize = True
 save_every = 2
+
+vf_fib = 0.6 # need to calculate this correctly later
 
 t0                    = 0.0
 tf                    = 1
@@ -39,7 +42,7 @@ cp_cer         = 750.0
 cp_fib         = 879
 
 alpha_mat      = 3.95e-6
-alpha_fib      = alpha_mat #-0.64e-6
+alpha_fib      = -0.64e-6
 
 rho_poly       = 1150.0    # updated
 rho_cer        = 2450.0    # updated
@@ -112,10 +115,14 @@ def get_vf_void(r, a, vf_poly_0):
 def get_vf_poly(vf_cer, vf_cer_0, vf_void):
     return 1 - vf_cer - vf_cer_0 - vf_void 
 
-def rule_of_mixtures(prop_poly, vf_poly, prop_cer, vf_cer):
+def rule_of_mixtures_matrix(prop_poly, vf_poly, prop_cer, vf_cer):
     return prop_poly * vf_poly + prop_cer * vf_cer
 
-def update_matrix_material_properties(r_old, u_temp_prev):
+def rule_of_mixtures_total(prop_matrix, prop_fib, vf_fib):
+    vf_matrix = 1 - vf_fib
+    return vf_matrix * prop_matrix + vf_fib * prop_fib
+
+def update_material_properties(r_old, u_temp_prev):
 
     r_new     = A_factor * (np.exp(-E_a / (R_gas * (u_temp_prev + 273.15)))) * (1 - r_old) ** n * dt + r_old
     
@@ -123,20 +130,22 @@ def update_matrix_material_properties(r_old, u_temp_prev):
     vf_void   = get_vf_void(r_new, a, vf_poly_0)
     vf_poly   = get_vf_poly(vf_cer, vf_cer_0, vf_void)
 
-    k_val     = rule_of_mixtures(k_poly, vf_poly, k_cer, vf_cer)
-    cp_val    = rule_of_mixtures(cp_poly, vf_poly, cp_cer, vf_cer) # is this the right way to calculate cp
-    alpha_val = rule_of_mixtures(alpha_mat, vf_poly, alpha_mat, vf_cer)
-    rho_val   = rule_of_mixtures(rho_poly, vf_poly, rho_cer, vf_cer)
-    E_val     = rule_of_mixtures(E_poly, vf_poly, E_cer, vf_cer)
-    nu_val    = rule_of_mixtures(nu_poly, vf_poly, nu_cer, vf_cer)
+    k_val_matrix     = rule_of_mixtures_matrix(k_poly, vf_poly, k_cer, vf_cer)
+    cp_val_matrix    = rule_of_mixtures_matrix(cp_poly, vf_poly, cp_cer, vf_cer) # is this the right way to calculate cp?
+    alpha_val_matrix = rule_of_mixtures_matrix(alpha_mat, vf_poly, alpha_mat, vf_cer)
+    rho_val_matrix   = rule_of_mixtures_matrix(rho_poly, vf_poly, rho_cer, vf_cer)
+
+    E_val     = rule_of_mixtures_matrix(E_poly, vf_poly, E_cer, vf_cer)
+    nu_val    = rule_of_mixtures_matrix(nu_poly, vf_poly, nu_cer, vf_cer)
     mu_val    = E_val / (2 * (1 + nu_val))
     lam_val   = E_val * nu_val / ((1 + nu_val) * (1 - 2 * nu_val))
 
     r_func.x.array[:]     = r_new
-    k_func.x.array[:]     = k_val
-    cp_func.x.array[:]    = cp_val
-    alpha_func.x.array[:] = alpha_val
-    rho_func.x.array[:]   = rho_val
+
+    k_func.x.array[:]     = rule_of_mixtures_total(k_val_matrix, k_fib, vf_fib)
+    cp_func.x.array[:]    = rule_of_mixtures_total(cp_val_matrix, cp_fib, vf_fib)
+    alpha_func.x.array[:] = rule_of_mixtures_total(alpha_val_matrix, alpha_fib, vf_fib)
+    rho_func.x.array[:]   = rule_of_mixtures_total(rho_val_matrix, rho_fib, vf_fib)
     E_func.x.array[:]     = E_val
     nu_func.x.array[:]    = nu_val
     mu_func.x.array[:]    = mu_val
@@ -154,11 +163,6 @@ def update_matrix_material_properties(r_old, u_temp_prev):
 
 mu_fib  = E_fib / (2 * (1 + nu_fib))
 lam_fib = E_fib * nu_fib / ((1 + nu_fib) * (1 - 2 * nu_fib))
-
-material_properties = { 
-    1: (mu_fib, lam_fib, alpha_fib, k_fib, cp_fib, rho_fib),
-    2: (mu_func, lam_func, alpha_func, k_func, cp_func, rho_func)
-}
 
 
 ##==================================================##
@@ -180,10 +184,8 @@ v_temp_current   = ufl.TestFunction(S_temp)
 ##==============================================##
 
 
-update_matrix_material_properties(r_func.x.array[:], u_temp_prev.x.array[:])
-
-if is_homogenize:
-    stiffness_tensor_homogenized = solve_unit_cell(r_func.x.array[:])
+update_material_properties(r_func.x.array[:], u_temp_prev.x.array[:])
+stiffness_tensor_homogenized = solve_unit_cell(r_func.x.array[:])
 
 
 ##======================================##
@@ -240,11 +242,8 @@ def epsilon(u):
 
 dx = ufl.Measure("dx", domain=domain, subdomain_data=cell_tags)
 
-R_temp = 0.0
-for tag, (_, _, _, k, cp, rho) in material_properties.items():
-
-    R_temp += rho * cp * (u_temp_current - u_temp_prev) / dt * v_temp_current * dx(tag) \
-           + ufl.dot(k * epsilon(u_temp_current), epsilon(v_temp_current)) * dx(tag)
+R_temp = rho_func * cp_func * (u_temp_current - u_temp_prev) / dt * v_temp_current * dx \
+        + ufl.dot(k_func * epsilon(u_temp_current), epsilon(v_temp_current)) * dx
 
 J_temp = ufl.derivative(R_temp, u_temp_current)
 
@@ -282,25 +281,13 @@ u_disp_prev = fem.Function(S_disp)
 dim_disp = domain.geometry.dim
 I = ufl.variable(ufl.Identity(dim_disp))
 
-def get_stiffness_tensor(mu, lam):
-    if is_homogenize:
-        C = stiffness_tensor_homogenized
-    else:
-        C = ufl.as_matrix([[lam + 2 * mu,     lam,           lam,           0,              0,              0],
-                            [lam,           lam + 2 * mu,     lam,           0,              0,              0],
-                            [lam,               lam,       lam + 2 * mu,     0,              0,              0],
-                            [0,                 0,              0,          mu,              0,              0],
-                            [0,                 0,              0,           0,             mu,              0],
-                            [0,                 0,              0,           0,              0,             mu]])
-    return C
-
-def get_voigt(matrix):
-    return ufl.as_vector([    matrix[0, 0],   # ₁₁
-                              matrix[1, 1],   # ₂₂
-                              matrix[2, 2],   # ₃₃
-                          2 * matrix[1, 2],   # ₂₃ 
-                          2 * matrix[0, 2],   # ₁₃ 
-                          2 * matrix[0, 1]    # ₁₂ 
+def get_voigt(tensor):
+    return ufl.as_vector([    tensor[0, 0],   # ₁₁
+                              tensor[1, 1],   # ₂₂
+                              tensor[2, 2],   # ₃₃
+                          2 * tensor[1, 2],   # ₂₃ 
+                          2 * tensor[0, 2],   # ₁₃ 
+                          2 * tensor[0, 1]    # ₁₂ 
                         ])
 
 def epsilon_sym(u):
@@ -314,29 +301,19 @@ def epsilon_volume(r):
 def epsilon_thermal(alpha, delta_temp):
     return get_voigt(alpha * delta_temp * I)
 
-def P_tot(u, mu, lam):
-    return ufl.dot(get_stiffness_tensor(mu, lam), epsilon_sym(u))
+def P_tot(u, C):
+    return ufl.dot(C, epsilon_sym(u))
 
-def P_volume(mu, lam, r):
-    return ufl.dot(get_stiffness_tensor(mu, lam), epsilon_volume(r))
+def P_volume(r, C):
+    return ufl.dot(C, epsilon_volume(r))
 
-def P_thermal(mu, lam, alpha, delta_temp):
-    return ufl.dot(get_stiffness_tensor(mu, lam), epsilon_thermal(alpha, delta_temp))
+def P_thermal(alpha, delta_temp, C):
+    return ufl.dot(C, epsilon_thermal(alpha, delta_temp))
 
 delta_temp = u_temp_prev - initial_temp
 
-a_disp = 0.0
-L_disp = 0.0
-
-for tag, (mu, lam, alpha, _, _, _) in material_properties.items():
-    if tag == 2:
-        a_disp += ufl.inner(epsilon_sym(v_disp_current), P_tot(u_disp_current, mu, lam)) * dx(tag)
-        L_disp += ufl.inner(epsilon_sym(v_disp_current), P_thermal(mu, lam, alpha, delta_temp)) * dx(tag)
-        # L_disp += ufl.inner(epsilon_sym(v_disp_current), P_volume(mu, lam, r_func)) * dx(tag)
-    else:
-        a_disp += ufl.inner(epsilon_sym(v_disp_current), P_tot(u_disp_current, mu, lam)) * dx(tag)
-        L_disp += ufl.inner(epsilon_sym(v_disp_current), P_thermal(mu, lam, alpha, delta_temp)) * dx(tag)
-
+a_disp = ufl.inner(epsilon_sym(v_disp_current), P_tot(u_disp_current, stiffness_tensor_homogenized)) * dx
+L_disp = ufl.inner(epsilon_sym(v_disp_current), P_thermal(alpha_func, delta_temp, stiffness_tensor_homogenized)) * dx
 problem_disp = LinearProblem(a_disp, L_disp, bcs=[bcs_disp])
 
 
@@ -349,19 +326,12 @@ phi    = ufl.TrialFunction(S_constant)
 psi    = ufl.TestFunction(S_constant)
 a_proj = ufl.inner(phi, psi) * dx
 
-L_proj_von_mises = 0.0
-for tag, (mu, lam, alpha, _, _, _) in material_properties.items():
-    if tag == 2:
-        tot_stress_expr = P_tot(u_disp_current_store, mu, lam) - P_thermal(mu, lam, alpha, delta_temp) - P_volume(mu, lam, r_func)
-    else:
-        tot_stress_expr = P_tot(u_disp_current_store, mu, lam) - P_thermal(mu, lam, alpha, delta_temp)       
-        
-    von_mises_expr = ufl.sqrt(0.5 * ((tot_stress_expr[0] - tot_stress_expr[1])**2 +
-                                     (tot_stress_expr[1] - tot_stress_expr[2])**2 +
-                                     (tot_stress_expr[2] - tot_stress_expr[0])**2 +
-                                     6 * (tot_stress_expr[3]**2 + tot_stress_expr[4]**2 + tot_stress_expr[5]**2)))
-    L_proj_von_mises += von_mises_expr * psi * dx(tag)
-
+tot_stress_expr = P_tot(u_disp_current_store, stiffness_tensor_homogenized) - P_thermal(alpha_func, delta_temp, stiffness_tensor_homogenized)       
+von_mises_expr = ufl.sqrt(0.5 * ((tot_stress_expr[0] - tot_stress_expr[1])**2 +
+                                    (tot_stress_expr[1] - tot_stress_expr[2])**2 +
+                                    (tot_stress_expr[2] - tot_stress_expr[0])**2 +
+                                    6 * (tot_stress_expr[3]**2 + tot_stress_expr[4]**2 + tot_stress_expr[5]**2)))
+L_proj_von_mises = von_mises_expr * psi * dx
 problem_stress_projection = LinearProblem(a_proj, L_proj_von_mises, bcs=[])
 
 
@@ -392,8 +362,8 @@ r_middle_point_values = []
 temp_middle_point_values = []
 
 t = t0 + dt
-print('\n')
-for i in trange(num_timesteps, colour="blue", desc="  Time Stepping", position=0, ncols=100):
+
+for i in trange(num_timesteps, colour="blue", desc="  Time Stepping", position=0, bar_format='{l_bar}{bar:40}{r_bar}', total=num_timesteps):
     
     r_middle_point    = r_func.x.array[len(r_func.x.array) // 2]
     temp_middle_point = u_temp_prev.x.array[len(u_temp_prev.x.array) // 2]
@@ -434,10 +404,8 @@ for i in trange(num_timesteps, colour="blue", desc="  Time Stepping", position=0
         xdmf.write_function(r_func, t)
         xdmf.write_function(E_func, t)
 
-    update_matrix_material_properties(r_func.x.array[:], u_temp_prev.x.array[:])
-
-    if is_homogenize:
-        stiffness_tensor_homogenized = solve_unit_cell(r_func.x.array[:])
+    update_material_properties(r_func.x.array[:], u_temp_prev.x.array[:])
+    stiffness_tensor_homogenized = solve_unit_cell(r_func.x.array[:])
 
     t += dt
 print('\n')

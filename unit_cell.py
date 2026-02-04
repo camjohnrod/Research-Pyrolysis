@@ -402,7 +402,7 @@ def solve_unit_cell(r_func):
     # temp_bc = initial_temp + ramp_param * (final_temp - initial_temp)
     # u_temp_prev.interpolate(lambda x: np.full(x.shape[1], temp_bc, dtype=default_scalar_type))
 
-    for i in trange(dim_load, colour="green", desc="Solve Unit Cell", position=1, leave=False, ncols=100):
+    for i in trange(dim_load, colour="red", desc="Solve Unit Cell", position=1, leave=False, bar_format='{l_bar}{bar:40}{r_bar}', total=dim_load):
         # print(f"Applying elementary load {i + 1}...")
         applied_eps.value = elementary_load[i]
         h_solve = problem_disp.solve()
