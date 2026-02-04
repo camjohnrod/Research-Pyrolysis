@@ -17,7 +17,7 @@ from unit_cell import solve_unit_cell
 
 print('\n')
 
-# Test Class
+# Test class
 
 ##======================================##
 ##=============== INPUTS ===============##
