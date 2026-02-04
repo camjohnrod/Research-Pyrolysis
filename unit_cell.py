@@ -33,8 +33,8 @@ def solve_unit_cell(r_func):
     alpha_matrix     = 3.95e-6
     alpha_fiber      = -0.64e-6
 
-    initial_temp     = 0.0
-    final_temp       = 1200.0
+    # initial_temp     = 0.0
+    # final_temp       = 1200.0
 
     length           = 24e-6
     width            = 24e-6
