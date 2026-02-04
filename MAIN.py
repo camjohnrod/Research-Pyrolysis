@@ -364,6 +364,7 @@ r_middle_point_values = []
 temp_middle_point_values = []
 
 t = t0 + dt
+print('\n')
 for i in tqdm(range(num_timesteps), colour="red", desc="Time Stepping"):
     
     r_middle_point    = r_func.x.array[len(r_func.x.array) // 2]
@@ -411,9 +412,10 @@ for i in tqdm(range(num_timesteps), colour="red", desc="Time Stepping"):
         stiffness_tensor_homogenized = solve_unit_cell(r_func.x.array[:])
 
     t += dt
+print('\n')
 
 xdmf.close()
-print('\n')
+
 
 plt.figure()
 plt.plot(temp_middle_point_values, r_middle_point_values, marker='o', color='r')

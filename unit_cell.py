@@ -402,7 +402,7 @@ def solve_unit_cell(r_func):
     # u_temp_prev.interpolate(lambda x: np.full(x.shape[1], temp_bc, dtype=default_scalar_type))
 
     for i in range(dim_load):
-        print(f"Applying elementary load {i + 1}...")
+        # print(f"Applying elementary load {i + 1}...")
         applied_eps.value = elementary_load[i]
         h_solve = problem_disp.solve()
         
@@ -419,21 +419,21 @@ def solve_unit_cell(r_func):
         
         xdmf.write_function(globals()[func_name])
 
-    print(' ')
-    print("Homogenized D matrix:")
-    print(' ')
-    for i in range(dim_load):
-        for j in range(dim_load):
-            if D_homogenized_matrix[i, j] < 1e-3:
-                print('  0.0  ', end='  ')
-            else:
-                print(f"{D_homogenized_matrix[i, j]:.3e}", end='  ')
+    # print(' ')
+    # print("Homogenized D matrix:")
+    # print(' ')
+    # for i in range(dim_load):
+    #     for j in range(dim_load):
+    #         if D_homogenized_matrix[i, j] < 1e-3:
+    #             print('  0.0  ', end='  ')
+    #         else:
+    #             print(f"{D_homogenized_matrix[i, j]:.3e}", end='  ')
 
-        print('\n', end='  ')
-    print(' ')
+    #     print('\n', end='  ')
+    # print(' ')
+    # print('\n')
 
     xdmf.close()
-    print('\n')
 
     # convert D_homogenized_matrix to ufl form:
     D_homogenized_matrix = ufl.as_matrix(D_homogenized_matrix)
