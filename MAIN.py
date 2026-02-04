@@ -17,6 +17,7 @@ from unit_cell import solve_unit_cell
 
 print('\n')
 
+# Test Class
 
 ##======================================##
 ##=============== INPUTS ===============##
@@ -67,9 +68,9 @@ height         = 24e-6
 
 # these values are also assumed 
 
-vf_cer_0       = 0.0               # initial ceramic volume fraction (=0.0 for the first pyrolysis cycle)
-vf_poly_0      = 1.0               # initial polymer volume fraction (=1.0 for the first pyrolysis cycle)
-a              = 0.05              # "void formation ratio of the precursor", value is not mentioned in the Zhang paper
+vf_cer_0       = 0.0          # initial ceramic volume fraction (=0.0 for the first pyrolysis cycle)
+vf_poly_0      = 1.0          # initial polymer volume fraction (=1.0 for the first pyrolysis cycle)
+a              = 0.05         # "void formation ratio of the precursor", value is not mentioned in the Zhang paper
 
 # taken from the Zhang paper 
 
