@@ -17,7 +17,6 @@ from   mpi4py import MPI
 from define_mpc import get_mpc
 from unit_cell import solve_unit_cell
 
-print('\n')
 
 if not os.path.exists("results"):
     os.makedirs("results")
@@ -223,11 +222,13 @@ material_state = MaterialState(domain, fiber, polymer, ceramic, vf_fib)
 ##=== CALCULATE STARTING MATERIAL PROPERTIES ===##
 ##==============================================##
 
+
 u_temp_prev.interpolate(lambda x: np.full(x.shape[1], initial_temp, dtype=default_scalar_type)) # is interpolate necessary
 
 material_state.update(material_state.r.x.array, u_temp_prev.x.array, dt)
 mpc, bcs_disp_unit_cell = get_mpc(domain, length, width, height)
-stiffness_tensor_homogenized = solve_unit_cell(domain, cell_tags, material_state, mpc, bcs_disp_unit_cell)
+stiffness_tensor_homogenized = fem.Constant(domain, np.zeros((6, 6), dtype=default_scalar_type))
+solve_unit_cell(domain, cell_tags, material_state, mpc, bcs_disp_unit_cell, stiffness_tensor_homogenized)
 
 
 ##======================================##
@@ -425,10 +426,9 @@ for i in trange(num_timesteps, colour="blue", desc="  Time Stepping", position=0
         xdmf.write_function(material_state.E, t)
 
     material_state.update(material_state.r.x.array, u_temp_prev.x.array, dt)
-    stiffness_tensor_homogenized = solve_unit_cell(domain, cell_tags, material_state, mpc, bcs_disp_unit_cell)
+    solve_unit_cell(domain, cell_tags, material_state, mpc, bcs_disp_unit_cell, stiffness_tensor_homogenized)
 
     t += dt
-print('\n')
 
 xdmf.close()
 

@@ -12,7 +12,7 @@ from   dolfinx_mpc import LinearProblem as MPCLinearProblem
 from   mpi4py import MPI
 
 
-def solve_unit_cell(domain, cell_tags, material_state, mpc, bcs_disp):
+def solve_unit_cell(domain, cell_tags, material_state, mpc, bcs_disp, homogenized_stiffness_tensor):
 
     length   = 24e-6
     width    = 24e-6
@@ -77,7 +77,7 @@ def solve_unit_cell(domain, cell_tags, material_state, mpc, bcs_disp):
                                 [0.0, 0.0, 0.0, 0.0, 0.0, 1.0]])
 
     dim_load = elementary_load.shape[0]
-    D_homogenized_matrix = np.ones((dim_load, dim_load))
+    temp_tensor = np.zeros((dim_load, dim_load))
     
     unit_cell_volume = length * width * height
 
@@ -89,8 +89,6 @@ def solve_unit_cell(domain, cell_tags, material_state, mpc, bcs_disp):
             applied_eps_.value = elementary_load[j]
             for tag, (mu, lam, _) in material_properties.items():
                 stiffness_matrix = get_stiffness_tensor(mu, lam)
-                D_homogenized_matrix[i, j] += (1 / unit_cell_volume) * fem.assemble_scalar(fem.form(ufl.inner(P_tot(h_solve, stiffness_matrix), applied_eps_) * dx(tag)))
+                temp_tensor[i, j] += (1 / unit_cell_volume) * fem.assemble_scalar(fem.form(ufl.inner(P_tot(h_solve, stiffness_matrix), applied_eps_) * dx(tag)))
 
-    D_homogenized_matrix = ufl.as_matrix(D_homogenized_matrix)
-
-    return D_homogenized_matrix
+    homogenized_stiffness_tensor.value = temp_tensor
