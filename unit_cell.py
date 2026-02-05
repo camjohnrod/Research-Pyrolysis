@@ -1,118 +1,116 @@
-import os
-from dolfinx import fem, mesh, io, plot, default_scalar_type
-from dolfinx.io import XDMFFile
-import ufl
-from dolfinx_mpc import LinearProblem as MPCLinearProblem
-from dolfinx.fem.petsc import NonlinearProblem, LinearProblem
-from dolfinx.nls.petsc import NewtonSolver
-import dolfinx_mpc.utils
-from mpi4py import MPI
 import numpy as np
-from tqdm import tqdm
-from tqdm.auto import trange
 import matplotlib.pyplot as plt
+import os
+from   tqdm import tqdm
+from   tqdm.auto import trange
 
-def solve_unit_cell(r_func):
+import ufl
+import dolfinx_mpc.utils
+from   dolfinx import fem, mesh, plot, default_scalar_type
+from   dolfinx.io import XDMFFile
+from   dolfinx_mpc import LinearProblem as MPCLinearProblem
+from   mpi4py import MPI
 
-    ## Inputs ##
 
-    # t0               = 0.0
-    # tf               = 10800
-    # ramp_duration    = 10800
-    # num_steps        = int(1)
-    # dt               = tf / num_steps
+def solve_unit_cell(domain, cell_tags, material_state):
 
-    E_polymer        = 4.94e9    # updated
-    E_ceramic        = 206.18e9  # updated
-    E_fiber          = 264.5e9
+    # E_polymer        = 4.94e9    # updated
+    # E_ceramic        = 206.18e9  # updated
+    # E_fiber          = 264.5e9
 
-    nu_polymer       = 0.3
-    nu_ceramic       = 0.14
-    nu_fiber         = 0.14
+    # nu_polymer       = 0.3
+    # nu_ceramic       = 0.14
+    # nu_fiber         = 0.14
 
-    alpha_matrix     = 3.95e-6
-    alpha_fiber      = -0.64e-6
+    # alpha_matrix     = 3.95e-6
+    # alpha_fiber      = -0.64e-6
 
-    # initial_temp     = 0.0
-    # final_temp       = 1200.0
+    # # initial_temp     = 0.0
+    # # final_temp       = 1200.0
 
     length           = 24e-6
     width            = 24e-6
     height           = 24e-6
 
-    vf_ceramic_0     = 0.0
-    vf_polymer_0     = 1.0
-    a                = 0.05
+    # vf_ceramic_0     = 0.0
+    # vf_polymer_0     = 1.0
+    # a                = 0.05
 
-    n                = 2
-    A_factor         = 1.5795 / (60)
-    E_a              = 18216.0
-    R_gas            = 8.3145
+    # n                = 2
+    # A_factor         = 1.5795 / (60)
+    # E_a              = 18216.0
+    # R_gas            = 8.3145
 
     ## Define mesh ##
 
-    with XDMFFile(MPI.COMM_WORLD, "mesh/rve_3D.xdmf", "r") as xdmf:
-        domain = xdmf.read_mesh(name="Grid")
-        cell_tags = xdmf.read_meshtags(domain, name="Grid")      
+    # with XDMFFile(MPI.COMM_WORLD, "mesh/rve_3D.xdmf", "r") as xdmf:
+    #     domain = xdmf.read_mesh(name="Grid")
+    #     cell_tags = xdmf.read_meshtags(domain, name="Grid")      
 
 
     ## Define material properties ##
 
-    S_mat_prop = fem.functionspace(domain, ("Lagrange", 1))
+    # S_mat_prop = fem.functionspace(domain, ("Lagrange", 1))
 
-    alpha_func = fem.Function(S_mat_prop, name="alpha")
-    # r_func = fem.Function(S_mat_prop, name="r")
-    E_func = fem.Function(S_mat_prop, name="E")
-    nu_func = fem.Function(S_mat_prop, name="nu")
-    mu_func = fem.Function(S_mat_prop, name="mu")
-    lam_func = fem.Function(S_mat_prop, name="lam")
+    # alpha_func = fem.Function(S_mat_prop, name="alpha")
+    # E_func = fem.Function(S_mat_prop, name="E")
+    # nu_func = fem.Function(S_mat_prop, name="nu")
+    # mu_func = fem.Function(S_mat_prop, name="mu")
+    # lam_func = fem.Function(S_mat_prop, name="lam")
 
-    def get_vf_ceramic(r, a, vf_polymer_0):
-        return (1 - a) * r * vf_polymer_0
+    # def get_vf_ceramic(r, a, vf_polymer_0):
+    #     return (1 - a) * r * vf_polymer_0
 
-    def get_vf_void(r, a, vf_polymer_0):
-        return a * r * vf_polymer_0
+    # def get_vf_void(r, a, vf_polymer_0):
+    #     return a * r * vf_polymer_0
 
-    def get_vf_polymer(vf_ceramic, vf_ceramic_0, vf_void):
-        return 1 - vf_ceramic - vf_ceramic_0 - vf_void 
+    # def get_vf_polymer(vf_ceramic, vf_ceramic_0, vf_void):
+    #     return 1 - vf_ceramic - vf_ceramic_0 - vf_void 
 
-    def rule_of_mixtures(prop_polymer, vf_polymer, prop_ceramic, vf_ceramic):
-        return prop_polymer * vf_polymer + prop_ceramic * vf_ceramic
+    # def rule_of_mixtures(prop_polymer, vf_polymer, prop_ceramic, vf_ceramic):
+    #     return prop_polymer * vf_polymer + prop_ceramic * vf_ceramic
 
-    def update_matrix_material_properties():
+    # def update_matrix_material_properties():
 
-        # r_new = A_factor * (np.exp(-E_a / (R_gas * (u_temp_prev + 273.15)))) * (1 - r_old) ** n * dt + r_old
+    #     # r_new = A_factor * (np.exp(-E_a / (R_gas * (u_temp_prev + 273.15)))) * (1 - r_old) ** n * dt + r_old
 
-        vf_ceramic = get_vf_ceramic(r_func, a, vf_polymer_0)
-        vf_void = get_vf_void(r_func, a, vf_polymer_0)
-        vf_polymer = get_vf_polymer(vf_ceramic, vf_ceramic_0, vf_void)
+    #     vf_ceramic = get_vf_ceramic(r_func, a, vf_polymer_0)
+    #     vf_void = get_vf_void(r_func, a, vf_polymer_0)
+    #     vf_polymer = get_vf_polymer(vf_ceramic, vf_ceramic_0, vf_void)
 
-        alpha_val = rule_of_mixtures(alpha_matrix, vf_polymer, alpha_matrix, vf_ceramic)
-        E_val = rule_of_mixtures(E_polymer, vf_polymer, E_ceramic, vf_ceramic)
-        nu_val = rule_of_mixtures(nu_polymer, vf_polymer, nu_ceramic, vf_ceramic)
-        mu_val = E_val / (2 * (1 + nu_val))
-        lam_val = E_val * nu_val / ((1 + nu_val) * (1 - 2 * nu_val))
+    #     alpha_val = rule_of_mixtures(alpha_matrix, vf_polymer, alpha_matrix, vf_ceramic)
+    #     E_val = rule_of_mixtures(E_polymer, vf_polymer, E_ceramic, vf_ceramic)
+    #     nu_val = rule_of_mixtures(nu_polymer, vf_polymer, nu_ceramic, vf_ceramic)
+    #     mu_val = E_val / (2 * (1 + nu_val))
+    #     lam_val = E_val * nu_val / ((1 + nu_val) * (1 - 2 * nu_val))
         
-        alpha_func.x.array[:] = alpha_val
-        # r_func.x.array[:] = r_new
-        E_func.x.array[:] = E_val
-        nu_func.x.array[:] = nu_val
-        mu_func.x.array[:] = mu_val
-        lam_func.x.array[:] = lam_val
+    #     alpha_func.x.array[:] = alpha_val
+    #     # r_func.x.array[:] = r_new
+    #     E_func.x.array[:] = E_val
+    #     nu_func.x.array[:] = nu_val
+    #     mu_func.x.array[:] = mu_val
+    #     lam_func.x.array[:] = lam_val
 
-        alpha_func.x.scatter_forward()
-        # r_func.x.scatter_forward()
-        E_func.x.scatter_forward()
-        nu_func.x.scatter_forward()
-        mu_func.x.scatter_forward()
-        lam_func.x.scatter_forward()
+    #     alpha_func.x.scatter_forward()
+    #     # r_func.x.scatter_forward()
+    #     E_func.x.scatter_forward()
+    #     nu_func.x.scatter_forward()
+    #     mu_func.x.scatter_forward()
+    #     lam_func.x.scatter_forward()
 
-    mu_fiber = E_fiber / (2 * (1 + nu_fiber))
-    lam_fiber = E_fiber * nu_fiber / ((1 + nu_fiber) * (1 - 2 * nu_fiber))
+    # mu_fiber = E_fiber / (2 * (1 + nu_fiber))
+    # lam_fiber = E_fiber * nu_fiber / ((1 + nu_fiber) * (1 - 2 * nu_fiber))
 
-    material_properties = { 
-        1: (mu_fiber, lam_fiber, alpha_fiber),
-        2: (mu_func, lam_func, alpha_func)
+    # material_properties = { 
+    #     1: (mu_fiber, lam_fiber, alpha_fiber),
+    #     2: (mu_func, lam_func, alpha_func)
+    # }
+
+    
+
+    material_properties = {
+        1: (material_state.fiber.mu, material_state.fiber.lam, material_state.fiber.alpha),
+        2: (material_state.mu, material_state.lam, material_state.alpha)
     }
 
 
@@ -305,11 +303,11 @@ def solve_unit_cell(r_func):
 
     def get_stiffness_matrix(mu, lam):
         C = ufl.as_matrix([[lam + 2 * mu,     lam,           lam,           0,              0,              0],
-                        [lam,           lam + 2 * mu,     lam,           0,              0,              0],
-                        [lam,               lam,       lam + 2 * mu,     0,              0,              0],
-                        [0,                 0,              0,          mu,              0,              0],
-                        [0,                 0,              0,           0,             mu,              0],
-                        [0,                 0,              0,           0,              0,             mu]])
+                           [lam,           lam + 2 * mu,     lam,           0,              0,              0],
+                           [lam,               lam,       lam + 2 * mu,     0,              0,              0],
+                           [0,                 0,              0,          mu,              0,              0],
+                           [0,                 0,              0,           0,             mu,              0],
+                           [0,                 0,              0,           0,              0,             mu]])
         return C
 
     dim_disp = domain.geometry.dim
@@ -396,7 +394,7 @@ def solve_unit_cell(r_func):
     
     ## Time stepping
     
-    update_matrix_material_properties()
+    # update_matrix_material_properties()
 
     # ramp_param = min(max(t / ramp_duration, 0.0), 1.0)
     # temp_bc = initial_temp + ramp_param * (final_temp - initial_temp)
@@ -434,7 +432,7 @@ def solve_unit_cell(r_func):
     # print(' ')
     # print('\n')
 
-    xdmf.close()
+    # xdmf.close()
 
     # convert D_homogenized_matrix to ufl form:
     D_homogenized_matrix = ufl.as_matrix(D_homogenized_matrix)

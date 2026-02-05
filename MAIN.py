@@ -1,10 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from   tqdm import tqdm
-from tqdm.auto import trange
 import os
-from dataclasses import dataclass
+from   tqdm import tqdm
+from   tqdm.auto import trange
+from   dataclasses import dataclass
 
+import ufl
 import dolfinx_mpc.utils
 from   dolfinx import fem, mesh, io, default_scalar_type
 from   dolfinx.io import XDMFFile
@@ -12,10 +13,9 @@ from   dolfinx_mpc import LinearProblem as MPCLinearProblem
 from   dolfinx.fem.petsc import NonlinearProblem, LinearProblem
 from   dolfinx.nls.petsc import NewtonSolver
 from   mpi4py import MPI
-import ufl
+
 
 from unit_cell import solve_unit_cell
-
 print('\n')
 
 
@@ -186,10 +186,9 @@ class MaterialState:
 
 material_state = MaterialState(domain, fiber, polymer, ceramic, vf_fib)
 
-
-##==================================================##
-##======= DEFINE TEMPERATURE FUNCTION SPACES =======##
-##==================================================##
+##==============================================##
+##=========== DEFINE FUNCTION SPACES ===========##
+##==============================================##
 
 
 S_temp = fem.functionspace(domain, ("Lagrange", 1))
@@ -200,6 +199,18 @@ u_temp_prev      = fem.Function(S_temp)
 u_temp_prev.name = "Temperature"
 v_temp_current   = ufl.TestFunction(S_temp)
 
+u_disp_current = ufl.TrialFunction(S_disp)
+v_disp_current = ufl.TestFunction(S_disp)
+
+u_disp_current_store = fem.Function(S_disp) 
+u_disp_current_store.name = "Displacement"
+u_disp_prev = fem.Function(S_disp)
+
+S_constant = fem.functionspace(domain, ("DG", 0))
+
+vm_stress_current = fem.Function(S_constant) 
+vm_stress_current.name = "von Mises Stress"
+
 
 ##==============================================##
 ##=== CALCULATE STARTING MATERIAL PROPERTIES ===##
@@ -207,7 +218,7 @@ v_temp_current   = ufl.TestFunction(S_temp)
 
 
 material_state.update(material_state.r.x.array, u_temp_prev.x.array, dt)
-stiffness_tensor_homogenized = solve_unit_cell(material_state.r.x.array)
+stiffness_tensor_homogenized = solve_unit_cell(domain, cell_tags, material_state)
 
 
 ##======================================##
@@ -277,27 +288,9 @@ solver_temp.max_it = 50
 solver_temp.convergence_criterion = "incremental"
 
 
-##===========================================##
-##=== DEFINE DISPLACEMENT FUNCTION SPACES ===##
-##===========================================##
-
-
-u_disp_current = ufl.TrialFunction(S_disp)
-v_disp_current = ufl.TestFunction(S_disp)
-
-S_constant = fem.functionspace(domain, ("DG", 0))
-
-vm_stress_current = fem.Function(S_constant) 
-vm_stress_current.name = "von Mises Stress"
-
-u_disp_current_store = fem.Function(S_disp) 
-u_disp_current_store.name = "Displacement"
-u_disp_prev = fem.Function(S_disp)
-
-
-##================================================================##
-##=== DEFINE THE (LINEAR) VARIATIONAL PROBLEM FOR DISPLACEMENT ===##
-##================================================================##
+##=============================================================##
+##=== DEFINE THE (LINEAR) VARIATIONAL FORM FOR DISPLACEMENT ===##
+##=============================================================##
 
 
 dim_disp = domain.geometry.dim
@@ -427,7 +420,7 @@ for i in trange(num_timesteps, colour="blue", desc="  Time Stepping", position=0
         xdmf.write_function(material_state.E, t)
 
     material_state.update(material_state.r.x.array, u_temp_prev.x.array, dt)
-    stiffness_tensor_homogenized = solve_unit_cell(material_state.r.x.array)
+    stiffness_tensor_homogenized = solve_unit_cell(domain, cell_tags, material_state)
 
     t += dt
 print('\n')
