@@ -14,9 +14,16 @@ from   dolfinx.fem.petsc import NonlinearProblem, LinearProblem
 from   dolfinx.nls.petsc import NewtonSolver
 from   mpi4py import MPI
 
-
+from define_mpc import get_mpc
 from unit_cell import solve_unit_cell
+
 print('\n')
+
+if not os.path.exists("results"):
+    os.makedirs("results")
+
+if not os.path.exists("mesh"):
+    os.makedirs("mesh")
 
 
 ##======================================##
@@ -88,6 +95,31 @@ R_gas          = 8.3145
 with XDMFFile(MPI.COMM_WORLD, "mesh/rve_3D.xdmf", "r") as xdmf:
     domain    = xdmf.read_mesh(name="Grid")
     cell_tags = xdmf.read_meshtags(domain, name="Grid")      
+
+
+##==============================================##
+##=========== DEFINE FUNCTION SPACES ===========##
+##==============================================##
+
+
+S_temp = fem.functionspace(domain, ("Lagrange", 1))
+S_disp = fem.functionspace(domain, ("Lagrange", 1, (domain.geometry.dim, )))
+S_constant = fem.functionspace(domain, ("DG", 0))
+
+u_temp_current   = fem.Function(S_temp)
+u_temp_prev      = fem.Function(S_temp)
+u_temp_prev.name = "Temperature"
+v_temp_current   = ufl.TestFunction(S_temp)
+
+u_disp_current = ufl.TrialFunction(S_disp)
+v_disp_current = ufl.TestFunction(S_disp)
+
+u_disp_current_store = fem.Function(S_disp) 
+u_disp_current_store.name = "Displacement"
+u_disp_prev = fem.Function(S_disp)
+
+vm_stress_current = fem.Function(S_constant) 
+vm_stress_current.name = "von Mises Stress"
 
 
 ##======================================##
@@ -186,39 +218,16 @@ class MaterialState:
 
 material_state = MaterialState(domain, fiber, polymer, ceramic, vf_fib)
 
-##==============================================##
-##=========== DEFINE FUNCTION SPACES ===========##
-##==============================================##
-
-
-S_temp = fem.functionspace(domain, ("Lagrange", 1))
-S_disp = fem.functionspace(domain, ("Lagrange", 1, (domain.geometry.dim, )))
-
-u_temp_current   = fem.Function(S_temp)
-u_temp_prev      = fem.Function(S_temp)
-u_temp_prev.name = "Temperature"
-v_temp_current   = ufl.TestFunction(S_temp)
-
-u_disp_current = ufl.TrialFunction(S_disp)
-v_disp_current = ufl.TestFunction(S_disp)
-
-u_disp_current_store = fem.Function(S_disp) 
-u_disp_current_store.name = "Displacement"
-u_disp_prev = fem.Function(S_disp)
-
-S_constant = fem.functionspace(domain, ("DG", 0))
-
-vm_stress_current = fem.Function(S_constant) 
-vm_stress_current.name = "von Mises Stress"
-
 
 ##==============================================##
 ##=== CALCULATE STARTING MATERIAL PROPERTIES ===##
 ##==============================================##
 
+u_temp_prev.interpolate(lambda x: np.full(x.shape[1], initial_temp, dtype=default_scalar_type)) # is interpolate necessary
 
 material_state.update(material_state.r.x.array, u_temp_prev.x.array, dt)
-stiffness_tensor_homogenized = solve_unit_cell(domain, cell_tags, material_state)
+mpc, bcs_disp_unit_cell = get_mpc(domain, length, width, height)
+stiffness_tensor_homogenized = solve_unit_cell(domain, cell_tags, material_state, mpc, bcs_disp_unit_cell)
 
 
 ##======================================##
@@ -263,12 +272,10 @@ fixed_dofs_disp   = fem.locate_dofs_topological(S_disp, fdim_plane, fixed_facets
 bcs_disp = fem.dirichletbc(np.array([0, 0, 0], dtype=default_scalar_type), fixed_dofs_disp, S_disp)
 
 
-##===========================================##
-##=== DEFINE TEMPERATURE VARIATIONAL FORM ===##
-##===========================================##
+##==================================================##
+##=== DEFINE THE VARIATIONAL FORM FOR TEMPERATURE===##
+##==================================================##
 
-
-u_temp_prev.interpolate(lambda x: np.full(x.shape[1], initial_temp, dtype=default_scalar_type)) # is interpolate necessary
 
 def epsilon(u):
     return ufl.grad(u)
@@ -309,18 +316,11 @@ def epsilon_sym(u):
     epsilon = ufl.sym(ufl.grad(u))
     return get_voigt(epsilon)
 
-def epsilon_volume(r):
-    beta = -0.3 * r ** 2 + 0.22 * r - 0.17
-    return get_voigt(beta * r * I)
-
 def epsilon_thermal(alpha, delta_temp):
     return get_voigt(alpha * delta_temp * I)
 
 def P_tot(u, C):
     return ufl.dot(C, epsilon_sym(u))
-
-def P_volume(r, C):
-    return ufl.dot(C, epsilon_volume(r))
 
 def P_thermal(alpha, delta_temp, C):
     return ufl.dot(C, epsilon_thermal(alpha, delta_temp))
@@ -355,9 +355,6 @@ problem_stress_projection = LinearProblem(a_proj, L_proj_von_mises, bcs=[])
 ##=================================================================##
 
 
-if not os.path.exists("results"):
-    os.makedirs("results")
-
 xdmf = io.XDMFFile(domain.comm, "results/results_3D.xdmf", "w")
 xdmf.write_mesh(domain)
 
@@ -378,13 +375,21 @@ temp_middle_point_values = []
 
 t = t0 + dt
 
-for i in trange(num_timesteps, colour="blue", desc="  Time Stepping", position=0, bar_format='{l_bar}{bar:40}{r_bar}', total=num_timesteps):
+for i in trange(num_timesteps, colour="blue", desc="  Time Stepping", position=0, bar_format='{l_bar}{bar:30}{r_bar}', total=num_timesteps):
     
+    ##================================================##
+    ##=== CALCULATE QUANTITIES AT THE CENTER POINT ===##
+    ##================================================##
+
     r_middle_point    = material_state.r.x.array[len(material_state.r.x.array) // 2]
     temp_middle_point = u_temp_prev.x.array[len(u_temp_prev.x.array) // 2]
 
     r_middle_point_values.append(r_middle_point)
     temp_middle_point_values.append(temp_middle_point)
+
+    ##==========================================##
+    ##=== SOLVE AND OUTPUT SOLUTION TO .xdmf ===##
+    ##==========================================##
 
     ramp_param = min(max(t / temp_ramp_duration, 0.0), 1.0)
     temp_bc    = initial_temp + ramp_param * (final_temp - initial_temp)
@@ -420,12 +425,18 @@ for i in trange(num_timesteps, colour="blue", desc="  Time Stepping", position=0
         xdmf.write_function(material_state.E, t)
 
     material_state.update(material_state.r.x.array, u_temp_prev.x.array, dt)
-    stiffness_tensor_homogenized = solve_unit_cell(domain, cell_tags, material_state)
+    stiffness_tensor_homogenized = solve_unit_cell(domain, cell_tags, material_state, mpc, bcs_disp_unit_cell)
 
     t += dt
 print('\n')
 
 xdmf.close()
+
+
+##===========================================##
+##=== PLOT QUANTITIES AT THE CENTER POINT ===##
+##===========================================##
+
 
 plt.figure()
 plt.plot(temp_middle_point_values, r_middle_point_values, marker='o', color='r')
