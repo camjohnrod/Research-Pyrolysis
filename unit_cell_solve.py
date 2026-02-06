@@ -90,10 +90,11 @@ def solve_unit_cell(domain, cell_tags, material_state, mpc, bcs_disp, homogenize
         h_solve = problem_disp.solve()
         
         for j in range(dim_load):
+            if ((i > 2) | (j > 2)) & (i != j):
+                continue
             applied_eps_.value = elementary_load[j]
             for tag, (mu, lam, _) in material_properties.items():
                 stiffness_matrix = get_stiffness_tensor(mu, lam)
                 temp_tensor[i, j] += (1 / unit_cell_volume) * fem.assemble_scalar(fem.form(ufl.inner(P_tot(h_solve, stiffness_matrix), applied_eps_) * dx(tag)))
 
-    temp_tensor[np.abs(temp_tensor) < 1e4] = 0.0
     homogenized_stiffness_tensor.value = temp_tensor
