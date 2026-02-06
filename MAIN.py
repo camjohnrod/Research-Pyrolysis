@@ -68,9 +68,9 @@ nu_fib         = 0.14
 initial_temp   = 0.0
 final_temp     = 1200.0
 
-length         = 24e-6
-width          = 24e-6
-height         = 24e-6
+# length         = 24e-6
+# width          = 24e-6
+# height         = 24e-6
 
 # these values are also assumed 
 
@@ -91,9 +91,10 @@ R_gas          = 8.3145
 ##======================================##
 
 
-with XDMFFile(MPI.COMM_WORLD, "mesh/rve_3D.xdmf", "r") as xdmf:
+with XDMFFile(MPI.COMM_WORLD, "mesh/domain_3D.xdmf", "r") as xdmf:
     domain    = xdmf.read_mesh(name="Grid")
     cell_tags = xdmf.read_meshtags(domain, name="Grid")      
+    
 
 
 ##==============================================##
@@ -223,54 +224,40 @@ material_state = MaterialState(domain, fiber, polymer, ceramic, vf_fib)
 ##==============================================##
 
 
+with XDMFFile(MPI.COMM_WORLD, "mesh/rve_3D.xdmf", "r") as xdmf:
+    domain_unit_cell    = xdmf.read_mesh(name="Grid")
+    cell_tags_unit_cell = xdmf.read_meshtags(domain_unit_cell, name="Grid")      
+
 u_temp_prev.interpolate(lambda x: np.full(x.shape[1], initial_temp, dtype=default_scalar_type)) # is interpolate necessary
 
 material_state.update(material_state.r.x.array, u_temp_prev.x.array, dt)
-mpc, bcs_disp_unit_cell = get_mpc(domain, length, width, height)
-stiffness_tensor_homogenized = fem.Constant(domain, np.zeros((6, 6), dtype=default_scalar_type))
-solve_unit_cell(domain, cell_tags, material_state, mpc, bcs_disp_unit_cell, stiffness_tensor_homogenized)
-
-
-##======================================##
-##==== DEFINE EACH BOUNDARY SURFACE ====##
-##======================================##
-
-
-def left(x):
-    return (np.isclose(x[0], 0))      # & (x[1] > 0) & (x[1] < width) & (x[2] > 0) & (x[2] < height))    
-def right(x):
-    return (np.isclose(x[0], length)) # & (x[1] > 0) & (x[1] < width) & (x[2] > 0) & (x[2] < height))
-def front(x):
-    return (np.isclose(x[1], 0))      # & (x[0] > 0) & (x[0] < length) & (x[2] > 0) & (x[2] < height))
-def back(x):
-    return (np.isclose(x[1], width))  # & (x[0] > 0) & (x[0] < length) & (x[2] > 0) & (x[2] < height))
-def bottom(x):
-    return (np.isclose(x[2], 0))      # & (x[0] > 0) & (x[0] < length) & (x[1] > 0) & (x[1] < width))
-def top(x):
-    return (np.isclose(x[2], height)) # & (x[0] > 0) & (x[0] < length) & (x[1] > 0) & (x[1] < width))
+mpc, bcs_disp_unit_cell = get_mpc(domain_unit_cell)
+stiffness_tensor_homogenized = fem.Constant(domain_unit_cell, np.zeros((6, 6), dtype=default_scalar_type))
+solve_unit_cell(domain_unit_cell, cell_tags_unit_cell, material_state, mpc, bcs_disp_unit_cell, stiffness_tensor_homogenized)
 
 
 ##======================================##
 ##======== BOUNDARY CONDITIONS =========##
 ##======================================##
+    
 
+def is_boundary(x):
+    return (x[0] < -0.013)
 
-def fixed_temp_dof(x):
-    return np.isclose(x[0], 0.0) | np.isclose(x[0], length) | np.isclose(x[1], 0.0) | np.isclose(x[1], width)
+def all_surfaces(x):
+    return np.full(x.shape[1], True, dtype=bool)
 
-def fixed_disp_dof(x):
-    return np.isclose(x[2], 0.0)
+fdim_plane = domain.topology.dim - 1
 
-fdim_plane = 2
+disp_facets         = mesh.locate_entities_boundary(domain, fdim_plane, is_boundary)
+temp_facets         = mesh.locate_entities_boundary(domain, fdim_plane, all_surfaces)
+fixed_dofs_disp   = fem.locate_dofs_topological(S_disp, fdim_plane, disp_facets)
+fixed_dofs_temp   = fem.locate_dofs_topological(S_temp, fdim_plane, temp_facets)
 
-fixed_facets_temp = mesh.locate_entities_boundary(domain, fdim_plane, fixed_temp_dof)
-fixed_dofs_temp   = fem.locate_dofs_topological(S_temp, fdim_plane, fixed_facets_temp)
-boundary_temp     = fem.Constant(domain, default_scalar_type(initial_temp))
-bcs_temp          = [fem.dirichletbc(boundary_temp, fixed_dofs_temp, S_temp)]
+boundary_temp   = fem.Constant(domain, default_scalar_type(initial_temp))
+bcs_temp        = [fem.dirichletbc(boundary_temp, fixed_dofs_temp, S_temp)]
 
-fixed_facets_disp = mesh.locate_entities_boundary(domain, fdim_plane, fixed_disp_dof)
-fixed_dofs_disp   = fem.locate_dofs_topological(S_disp, fdim_plane, fixed_facets_disp)
-bcs_disp = fem.dirichletbc(np.array([0, 0, 0], dtype=default_scalar_type), fixed_dofs_disp, S_disp)
+bcs_disp = fem.dirichletbc(fem.Constant(domain, np.array([0.0, 0.0, 0.0], dtype=default_scalar_type)), fixed_dofs_disp, S_disp)
 
 
 ##==================================================##
@@ -281,7 +268,7 @@ bcs_disp = fem.dirichletbc(np.array([0, 0, 0], dtype=default_scalar_type), fixed
 def epsilon(u):
     return ufl.grad(u)
 
-dx = ufl.Measure("dx", domain=domain, subdomain_data=cell_tags)
+dx = ufl.Measure("dx", domain=domain)
 
 R_temp = material_state.rho * material_state.cp * (u_temp_current - u_temp_prev) / dt * v_temp_current * dx \
         + ufl.dot(material_state.k * epsilon(u_temp_current), epsilon(v_temp_current)) * dx
@@ -426,7 +413,7 @@ for i in trange(num_timesteps, colour="blue", desc="  Time Stepping", position=0
         xdmf.write_function(material_state.E, t)
 
     material_state.update(material_state.r.x.array, u_temp_prev.x.array, dt)
-    solve_unit_cell(domain, cell_tags, material_state, mpc, bcs_disp_unit_cell, stiffness_tensor_homogenized)
+    solve_unit_cell(domain_unit_cell, cell_tags_unit_cell, material_state, mpc, bcs_disp_unit_cell, stiffness_tensor_homogenized)
 
     t += dt
 

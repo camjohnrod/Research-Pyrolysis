@@ -18,6 +18,8 @@ def solve_unit_cell(domain, cell_tags, material_state, mpc, bcs_disp, homogenize
     width    = 24e-6
     height   = 24e-6    
 
+    unit_cell_volume = length * width * height
+
     S_disp = fem.functionspace(domain, ("Lagrange", 1, (domain.geometry.dim, )))
 
     h = ufl.TrialFunction(S_disp)
@@ -53,9 +55,13 @@ def solve_unit_cell(domain, cell_tags, material_state, mpc, bcs_disp, homogenize
         sigma_voigt = ufl.dot(stiffness_matrix, epsilon_tot)
         return sigma_voigt
 
+    mu_const     = fem.Constant(domain, np.mean(material_state.mu.x.array[:]))
+    lam_const    = fem.Constant(domain, np.mean(material_state.lam.x.array[:]))
+    alpha_const  = fem.Constant(domain, np.mean(material_state.alpha.x.array[:]))
+    
     material_properties = {
         1: (material_state.fiber.mu, material_state.fiber.lam, material_state.fiber.alpha),
-        2: (material_state.mu, material_state.lam, material_state.alpha)
+        2: (mu_const, lam_const, alpha_const)
     }
 
     dx = ufl.Measure("dx", domain=domain, subdomain_data=cell_tags)
@@ -78,8 +84,6 @@ def solve_unit_cell(domain, cell_tags, material_state, mpc, bcs_disp, homogenize
 
     dim_load = elementary_load.shape[0]
     temp_tensor = np.zeros((dim_load, dim_load))
-    
-    unit_cell_volume = length * width * height
 
     for i in trange(dim_load, colour="red", desc="Solve Unit Cell", position=1, leave=False, bar_format='{l_bar}{bar:30}{r_bar}', total=dim_load):
         applied_eps.value = elementary_load[i]
