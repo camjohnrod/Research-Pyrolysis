@@ -14,8 +14,8 @@ from   dolfinx.fem.petsc import NonlinearProblem, LinearProblem
 from   dolfinx.nls.petsc import NewtonSolver
 from   mpi4py import MPI
 
-from define_mpc import get_mpc
-from unit_cell import solve_unit_cell
+from unit_cell_mpc import get_mpc
+from unit_cell_solve import solve_unit_cell
 
 
 if not os.path.exists("results"):
@@ -35,9 +35,9 @@ save_every = 1
 vf_fib = 0.6 # need to calculate this correctly later
 
 t0                    = 0.0
-tf                    = 10
-temp_ramp_duration    = tf
-num_timesteps         = int(50)
+tf                    = 3 * 60 * 60
+temp_ramp_duration    = 3 * 60 * 60
+num_timesteps         = int(tf / 60 / 5)
 dt                    = tf / num_timesteps
 
 k_poly         = 12.6
@@ -242,7 +242,7 @@ solve_unit_cell(domain_unit_cell, cell_tags_unit_cell, material_state, mpc, bcs_
     
 
 def is_boundary(x):
-    return (x[0] < -0.013)
+    return ((x[0] <= -0.013) & (x[1] <= 0.033))
 
 def all_surfaces(x):
     return np.full(x.shape[1], True, dtype=bool)

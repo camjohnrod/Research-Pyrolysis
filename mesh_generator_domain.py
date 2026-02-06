@@ -16,10 +16,10 @@ L = 60.0e-3       # length of the rectangular arm
 W = 110.0e-3      # thickness in z
 
 # Transfinite mesh divisions
-n_radial = 8      # divisions along radial direction (inner to outer)
-n_arc = 20        # divisions along arc
-n_length = 25     # divisions along arm length
-n_thickness = 15  # divisions through thickness (z-direction)
+n_radial = 5      # divisions along radial direction (inner to outer)
+n_arc = 12        # divisions along arc
+n_length = 20     # divisions along arm length
+n_thickness = 5   # divisions through thickness (z-direction)
 
 half = theta / 2
 a1 = math.pi/2 - half  # left end of arc (where arm will extend)
@@ -27,6 +27,12 @@ a2 = math.pi/2 + half  # right end of arc
 
 def tangent(a):
     return math.sin(a), -math.cos(a), 0.0
+
+# ============================================================================
+# ISSUE IDENTIFIED: The fragment operation destroys transfinite constraints!
+# SOLUTION: Apply transfinite meshing AFTER fragment operation to the 
+# resulting merged geometry
+# ============================================================================
 
 # ---------------------------
 # PART 1: Create 2D fillet cross-section at z=0
@@ -47,22 +53,14 @@ fillet_surf = gmsh.model.occ.addPlaneSurface([loop])
 
 gmsh.model.occ.synchronize()
 
-# Apply transfinite to 2D fillet surface
-gmsh.model.mesh.setTransfiniteCurve(outer_arc, n_arc)
-gmsh.model.mesh.setTransfiniteCurve(inner_arc, n_arc)
-gmsh.model.mesh.setTransfiniteCurve(r1, n_radial)
-gmsh.model.mesh.setTransfiniteCurve(r2, n_radial)
-gmsh.model.mesh.setTransfiniteSurface(fillet_surf)
-gmsh.model.mesh.setRecombine(2, fillet_surf)
+# DON'T apply transfinite here - it will be lost after fragment operation
 
 # ---------------------------
-# PART 2: Extrude fillet to create 3D volume
+# PART 2: Extrude fillet to create 3D volume (without transfinite yet)
 # ---------------------------
 fillet_extrude = gmsh.model.occ.extrude(
     [(2, fillet_surf)], 
-    0, 0, W, 
-    numElements=[n_thickness], 
-    recombine=True
+    0, 0, W
 )
 
 fillet_vol = fillet_extrude[1][1]
@@ -89,22 +87,14 @@ arm_surf = gmsh.model.occ.addPlaneSurface([arm_loop])
 
 gmsh.model.occ.synchronize()
 
-# Apply transfinite to 2D arm surface
-gmsh.model.mesh.setTransfiniteCurve(arm_e1, n_length)
-gmsh.model.mesh.setTransfiniteCurve(arm_e2, n_radial)
-gmsh.model.mesh.setTransfiniteCurve(arm_e3, n_length)
-gmsh.model.mesh.setTransfiniteCurve(arm_e4, n_radial)
-gmsh.model.mesh.setTransfiniteSurface(arm_surf)
-gmsh.model.mesh.setRecombine(2, arm_surf)
+# DON'T apply transfinite here - it will be lost after fragment operation
 
 # ---------------------------
-# PART 4: Extrude arm to create 3D volume
+# PART 4: Extrude arm to create 3D volume (without transfinite yet)
 # ---------------------------
 arm_extrude = gmsh.model.occ.extrude(
     [(2, arm_surf)], 
-    0, 0, W, 
-    numElements=[n_thickness], 
-    recombine=True
+    0, 0, W
 )
 
 arm_vol = arm_extrude[1][1]
@@ -126,11 +116,79 @@ gmsh.model.occ.translate(all_entities, 0, 0, -W/2)
 
 gmsh.model.occ.synchronize()
 
-# ---------------------------
-# Get all surfaces for physical groups
-# ---------------------------
+# ============================================================================
+# CRITICAL FIX: Apply transfinite meshing AFTER all boolean operations
+# ============================================================================
+
+print("\n=== Applying Transfinite Mesh Constraints ===")
+
+# Get all curves and surfaces after fragment operation
+all_curves = gmsh.model.getEntities(1)
 all_surfaces = gmsh.model.getEntities(2)
+
+# Strategy: Classify curves by their geometric properties and apply 
+# appropriate transfinite divisions
+
+for dim, tag in all_curves:
+    # Get curve bounding box and length
+    bbox = gmsh.model.getBoundingBox(dim, tag)
+    x_min, y_min, z_min, x_max, y_max, z_max = bbox
+    
+    # Curves in z-direction (thickness)
+    if abs(x_max - x_min) < 1e-6 and abs(y_max - y_min) < 1e-6:
+        gmsh.model.mesh.setTransfiniteCurve(tag, n_thickness)
+        print(f"Curve {tag}: z-direction -> {n_thickness} divisions")
+    
+    # Curves in xy-plane (radial direction: short curves)
+    elif abs(z_max - z_min) < 1e-6:
+        # Calculate curve length to distinguish radial vs arc vs arm length
+        mass_data = gmsh.model.occ.getMass(dim, tag)
+        curve_length = mass_data
+        
+        # Radial curves (thickness of the beam: Ro-Ri ≈ 7mm)
+        if curve_length < 0.015:  # Less than 15mm
+            gmsh.model.mesh.setTransfiniteCurve(tag, n_radial)
+            print(f"Curve {tag}: radial (L={curve_length*1000:.1f}mm) -> {n_radial} divisions")
+        
+        # Arc curves (around the fillet)
+        elif curve_length < 0.040:  # Between 15-40mm (arc portion)
+            gmsh.model.mesh.setTransfiniteCurve(tag, n_arc)
+            print(f"Curve {tag}: arc (L={curve_length*1000:.1f}mm) -> {n_arc} divisions")
+        
+        # Arm length curves
+        else:  # Longer curves (arm length ≈ 60mm)
+            gmsh.model.mesh.setTransfiniteCurve(tag, n_length)
+            print(f"Curve {tag}: arm length (L={curve_length*1000:.1f}mm) -> {n_length} divisions")
+
+# Apply transfinite to all quadrilateral surfaces and recombine
+print("\n=== Applying Transfinite Surfaces ===")
+for dim, tag in all_surfaces:
+    # Get the surface's bounding curves
+    boundaries = gmsh.model.getBoundary([(dim, tag)], oriented=False)
+    
+    # Only apply to surfaces with 4 boundaries (quadrilateral topology)
+    if len(boundaries) == 4:
+        try:
+            gmsh.model.mesh.setTransfiniteSurface(tag)
+            gmsh.model.mesh.setRecombine(2, tag)
+            print(f"Surface {tag}: transfinite + recombine applied")
+        except Exception as e:
+            print(f"Surface {tag}: Could not apply transfinite - {e}")
+
+# Apply transfinite to volumes
+print("\n=== Applying Transfinite Volumes ===")
 all_volumes = gmsh.model.getEntities(3)
+for dim, tag in all_volumes:
+    try:
+        gmsh.model.mesh.setTransfiniteVolume(tag)
+        gmsh.model.mesh.setRecombine(3, tag)
+        print(f"Volume {tag}: transfinite + recombine applied")
+    except Exception as e:
+        print(f"Volume {tag}: Could not apply transfinite - {e}")
+
+# ---------------------------
+# Physical Groups for Boundary Conditions
+# ---------------------------
 
 # Create a physical group for the entire volume
 vol_tags = [v[1] for v in all_volumes]
@@ -168,7 +226,7 @@ for surf_dim, surf_tag in all_surfaces:
 if midplane_surfaces:
     gmsh.model.addPhysicalGroup(2, midplane_surfaces, tag=2)
     gmsh.model.setPhysicalName(2, 2, "Midplane_z0")
-    print(f"Tagged {len(midplane_surfaces)} midplane surface(s) at z=0")
+    print(f"\nTagged {len(midplane_surfaces)} midplane surface(s) at z=0")
 
 if dirichlet_surfaces:
     gmsh.model.addPhysicalGroup(2, dirichlet_surfaces, tag=3)
@@ -183,14 +241,21 @@ if temperature_surfaces:
 # ---------------------------
 # Mesh generation
 # ---------------------------
+print("\n=== Generating Mesh ===")
 gmsh.model.mesh.generate(3)
 gmsh.write("mesh/domain_3D.msh")
+print("Mesh written to mesh/domain_3D.msh")
+
+# Optional: launch GUI to inspect mesh
 gmsh.fltk.run()
+
 gmsh.finalize()
 
 # ================================================================
 # Convert .msh to .xdmf using meshio
 # ================================================================
+
+print("\n=== Converting to XDMF ===")
 
 filename_old = "domain_3D.msh"
 filename_new = "domain_3D.xdmf"
