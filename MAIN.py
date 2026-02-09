@@ -32,11 +32,13 @@ if not os.path.exists("mesh"):
 
 save_every = 1
 
-vf_fib = 0.6 # need to calculate this correctly later
+vf_fib = 0.267 # hard coded
 
 t0                    = 0.0
-tf                    = 3 * 60 * 60
 temp_ramp_duration    = 3 * 60 * 60
+temp_hold_duration    = 2 * 60 * 60
+num_cycles            = 1
+tf                    = num_cycles * (2 * temp_ramp_duration + temp_hold_duration)
 num_timesteps         = int(tf / 60 / 5)
 dt                    = tf / num_timesteps
 
@@ -68,10 +70,6 @@ nu_fib         = 0.14
 initial_temp   = 0.0
 final_temp     = 1200.0
 
-# length         = 24e-6
-# width          = 24e-6
-# height         = 24e-6
-
 # these values are also assumed 
 
 vf_cer_0       = 0.0          # initial ceramic volume fraction (=0.0 for the first pyrolysis cycle)
@@ -95,7 +93,6 @@ with XDMFFile(MPI.COMM_WORLD, "mesh/domain_3D.xdmf", "r") as xdmf:
     domain    = xdmf.read_mesh(name="Grid")
     cell_tags = xdmf.read_meshtags(domain, name="Grid")      
     
-
 
 ##==============================================##
 ##=========== DEFINE FUNCTION SPACES ===========##
@@ -229,17 +226,19 @@ with XDMFFile(MPI.COMM_WORLD, "mesh/rve_3D.xdmf", "r") as xdmf:
     cell_tags_unit_cell = xdmf.read_meshtags(domain_unit_cell, name="Grid")      
 
 u_temp_prev.interpolate(lambda x: np.full(x.shape[1], initial_temp, dtype=default_scalar_type)) # is interpolate necessary
+delta_temp = u_temp_prev - initial_temp
 
 material_state.update(material_state.r.x.array, u_temp_prev.x.array, dt)
 mpc, bcs_disp_unit_cell = get_mpc(domain_unit_cell)
 stiffness_tensor_homogenized = fem.Constant(domain_unit_cell, np.zeros((6, 6), dtype=default_scalar_type))
-solve_unit_cell(domain_unit_cell, cell_tags_unit_cell, material_state, mpc, bcs_disp_unit_cell, stiffness_tensor_homogenized)
+eigenstrain_homogenized = fem.Constant(domain_unit_cell, np.zeros(6, dtype=default_scalar_type))
+solve_unit_cell(domain_unit_cell, cell_tags_unit_cell, material_state, mpc, bcs_disp_unit_cell, u_temp_prev, stiffness_tensor_homogenized, eigenstrain_homogenized)
 
 
 ##======================================##
 ##======== BOUNDARY CONDITIONS =========##
 ##======================================##
-    
+
 
 def is_boundary(x):
     return ((x[0] <= -0.013) & (x[1] <= 0.033))
@@ -304,19 +303,14 @@ def epsilon_sym(u):
     epsilon = ufl.sym(ufl.grad(u))
     return get_voigt(epsilon)
 
-def epsilon_thermal(alpha, delta_temp):
-    return get_voigt(alpha * delta_temp * I)
-
 def P_tot(u, C):
     return ufl.dot(C, epsilon_sym(u))
 
-def P_thermal(alpha, delta_temp, C):
-    return ufl.dot(C, epsilon_thermal(alpha, delta_temp))
-
-delta_temp = u_temp_prev - initial_temp
+def P_eigenstrain(eig, C):
+    return ufl.dot(C, eig)
 
 a_disp = ufl.inner(epsilon_sym(v_disp_current), P_tot(u_disp_current, stiffness_tensor_homogenized)) * dx
-L_disp = ufl.inner(epsilon_sym(v_disp_current), P_thermal(material_state.alpha, delta_temp, stiffness_tensor_homogenized)) * dx
+L_disp = ufl.inner(epsilon_sym(v_disp_current), P_eigenstrain(eigenstrain_homogenized, stiffness_tensor_homogenized)) * dx
 problem_disp = LinearProblem(a_disp, L_disp, bcs=[bcs_disp])
 
 
@@ -329,7 +323,7 @@ phi    = ufl.TrialFunction(S_constant)
 psi    = ufl.TestFunction(S_constant)
 a_proj = ufl.inner(phi, psi) * dx
 
-tot_stress_expr = P_tot(u_disp_current_store, stiffness_tensor_homogenized) - P_thermal(material_state.alpha, delta_temp, stiffness_tensor_homogenized)       
+tot_stress_expr = P_tot(u_disp_current_store, stiffness_tensor_homogenized) - P_eigenstrain(eigenstrain_homogenized, stiffness_tensor_homogenized)       
 von_mises_expr = ufl.sqrt(0.5 * ((tot_stress_expr[0] - tot_stress_expr[1])**2 +
                                  (tot_stress_expr[1] - tot_stress_expr[2])**2 +
                                  (tot_stress_expr[2] - tot_stress_expr[0])**2 +
@@ -383,6 +377,8 @@ for i in trange(num_timesteps, colour="blue", desc="  Time Stepping", position=0
     temp_bc    = initial_temp + ramp_param * (final_temp - initial_temp)
     boundary_temp.value = default_scalar_type(temp_bc)
 
+    current_cycle = np.floor(t / (tf /  num_cycles))
+
     num_its_temp, converged_temp = solver_temp.solve(u_temp_current)
     if not converged_temp:
         raise RuntimeError(f"Newton failed to converge at timestep {i+1}")
@@ -413,7 +409,7 @@ for i in trange(num_timesteps, colour="blue", desc="  Time Stepping", position=0
         xdmf.write_function(material_state.E, t)
 
     material_state.update(material_state.r.x.array, u_temp_prev.x.array, dt)
-    solve_unit_cell(domain_unit_cell, cell_tags_unit_cell, material_state, mpc, bcs_disp_unit_cell, stiffness_tensor_homogenized)
+    solve_unit_cell(domain_unit_cell, cell_tags_unit_cell, material_state, mpc, bcs_disp_unit_cell, u_temp_prev, stiffness_tensor_homogenized, eigenstrain_homogenized)
 
     t += dt
 

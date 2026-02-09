@@ -16,10 +16,10 @@ L = 60.0e-3       # length of the rectangular arm
 W = 110.0e-3      # thickness in z
 
 # Transfinite mesh divisions
-n_radial = 5      # divisions along radial direction (inner to outer)
-n_arc = 12        # divisions along arc
-n_length = 20     # divisions along arm length
-n_thickness = 5   # divisions through thickness (z-direction)
+n_radial = 7      # divisions along radial direction (inner to outer)
+n_arc = 17        # divisions along arc
+n_length = 23     # divisions along arm length
+n_thickness = 7   # divisions through thickness (z-direction)
 
 half = theta / 2
 a1 = math.pi/2 - half  # left end of arc (where arm will extend)
