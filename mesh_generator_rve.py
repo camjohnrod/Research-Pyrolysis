@@ -18,8 +18,8 @@ cy = Ly / 2     # circle center y
 r  = 7e-6     # radius
 
 # --- Mesh controls ---
-n_outer = 10      # divisions on outer edges
-n_inner = 10      # divisions on fiber–matrix connectors
+n_outer = 6      # divisions on outer edges
+n_inner = 6      # divisions on fiber–matrix connectors
 nz      = 4       # number of layers in z extrusion
 thick   = Lx      # extrusion thickness
 

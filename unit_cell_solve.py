@@ -6,18 +6,26 @@ from   tqdm.auto import trange
 
 import ufl
 import dolfinx_mpc.utils
-from   dolfinx import fem
+from   dolfinx import fem, default_scalar_type
 from   dolfinx_mpc import LinearProblem as MPCLinearProblem
 from   mpi4py import MPI
 
 
-def solve_unit_cell(domain, cell_tags, material_state, mpc, bcs_disp, u_temp_prev, stiffness_tensor_homogenized, eigenstrain_homogenized):
+def solve_unit_cell(domain, cell_tags, material_state, mpc, bcs_disp, u_temp_prev, previous_beta, stiffness_tensor_homogenized, eigenstrain_homogenized):
 
     length   = 24e-6
     width    = 24e-6
     height   = 24e-6    
 
     unit_cell_volume = length * width * height
+
+    mu_const     = fem.Constant(domain, np.mean(material_state.mu.x.array[:]))
+    lam_const    = fem.Constant(domain, np.mean(material_state.lam.x.array[:]))
+    alpha_const  = fem.Constant(domain, np.mean(material_state.alpha.x.array[:]))
+    vf_poly_const = fem.Constant(domain, np.mean(material_state.vf_poly))
+    r_new_const      = fem.Constant(domain, np.mean(material_state.r_new.x.array[:]))
+    r_old_const      = fem.Constant(domain, np.mean(material_state.r_old.x.array[:]))
+    # r_const_diff  = fem.Constant(domain, np.mean(material_state.r_new.x.array[:]) - np.mean(material_state.r_old.x.array[:]))
 
     S = fem.functionspace(domain, ("Lagrange", 1, (domain.geometry.dim, )))
     
@@ -42,9 +50,15 @@ def solve_unit_cell(domain, cell_tags, material_state, mpc, bcs_disp, u_temp_pre
     dim = domain.geometry.dim
     I = ufl.variable(ufl.Identity(dim))
 
-    def epsilon_volume(r):
-        beta = -0.3 * r ** 2 + 0.22 * r - 0.17
-        return get_voigt(beta * r * I)
+    def get_beta(r_new, r_old):
+        # beta = (-0.3 * r ** 2 + 0.22 * r - 0.17)
+        # return vf_poly_const * beta * r_diff
+        return vf_poly_const * ((-0.3 * r_new ** 3 + 0.22 * r_new ** 2 - 0.17 * r_new) - (-0.3 * r_old ** 3 + 0.22 * r_old ** 2 - 0.17 * r_old))
+    
+    current_beta = get_beta(r_new_const, r_old_const)
+
+    def epsilon_volume(current_beta, previous_beta):
+        return get_voigt((current_beta + previous_beta) * I)
 
     def epsilon_thermal(alpha, delta_temp):
         return get_voigt(alpha * delta_temp * I)
@@ -68,11 +82,6 @@ def solve_unit_cell(domain, cell_tags, material_state, mpc, bcs_disp, u_temp_pre
 
     def P_tot(k, stiffness_matrix):
         return ufl.dot(stiffness_matrix, epsilon_sym(k))
-
-    mu_const     = fem.Constant(domain, np.mean(material_state.mu.x.array[:]))
-    lam_const    = fem.Constant(domain, np.mean(material_state.lam.x.array[:]))
-    alpha_const  = fem.Constant(domain, np.mean(material_state.alpha.x.array[:]))
-    r_const      = fem.Constant(domain, np.mean(material_state.r.x.array[:]))
     
     material_properties = {
         1: (material_state.fiber.mu, material_state.fiber.lam, material_state.fiber.alpha),
@@ -97,7 +106,7 @@ def solve_unit_cell(domain, cell_tags, material_state, mpc, bcs_disp, u_temp_pre
 
         if tag == 2:
             a_k += ufl.inner(epsilon_sym(k_), P_tot(k, stiffness_matrix)) * dx(tag)
-            L_k += ufl.inner(epsilon_sym(k_), ufl.dot(stiffness_matrix, epsilon_thermal(alpha, delta_temp) + epsilon_volume(r_const))) * dx(tag)
+            L_k += ufl.inner(epsilon_sym(k_), ufl.dot(stiffness_matrix, epsilon_thermal(alpha, delta_temp) + epsilon_volume(current_beta, previous_beta))) * dx(tag)
         else:    
             a_k += ufl.inner(epsilon_sym(k_), P_tot(k, stiffness_matrix)) * dx(tag)
             L_k += ufl.inner(epsilon_sym(k_), ufl.dot(stiffness_matrix, epsilon_thermal(alpha, delta_temp))) * dx(tag)       
@@ -142,10 +151,12 @@ def solve_unit_cell(domain, cell_tags, material_state, mpc, bcs_disp, u_temp_pre
             applied_eps_.value = elementary_load[j]
             if tag == 2:
                 temporary_vector[j] += fem.assemble_scalar(fem.form(ufl.inner(ufl.dot(stiffness_matrix, epsilon_sym(K_solve)), applied_eps_) * dx(tag)))
-                temporary_vector[j] -= fem.assemble_scalar(fem.form(ufl.inner(ufl.dot(stiffness_matrix, epsilon_thermal(alpha, delta_temp) + epsilon_volume(r_const)), applied_eps_) * dx(tag)))
+                temporary_vector[j] -= fem.assemble_scalar(fem.form(ufl.inner(ufl.dot(stiffness_matrix, epsilon_thermal(alpha, delta_temp) + epsilon_volume(current_beta, previous_beta)), applied_eps_) * dx(tag)))
             else:
                 temporary_vector[j] += fem.assemble_scalar(fem.form(ufl.inner(ufl.dot(stiffness_matrix, epsilon_sym(K_solve)), applied_eps_) * dx(tag)))
                 temporary_vector[j] -= fem.assemble_scalar(fem.form(ufl.inner(ufl.dot(stiffness_matrix, epsilon_thermal(alpha, delta_temp)), applied_eps_) * dx(tag)))
                 
     mu_bar = -(1 / unit_cell_volume) * np.linalg.inv(temporary_tensor) @ temporary_vector
     eigenstrain_homogenized.value = mu_bar
+
+    previous_beta.value += float(current_beta)

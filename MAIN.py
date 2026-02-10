@@ -30,17 +30,19 @@ if not os.path.exists("mesh"):
 ##======================================##
 
 
-save_every = 1
+save_every = 5
 
 vf_fib = 0.267 # hard coded
 
-t0                    = 0.0
-temp_ramp_duration    = 3 * 60 * 60
-temp_hold_duration    = 2 * 60 * 60
-num_cycles            = 1
-tf                    = num_cycles * (2 * temp_ramp_duration + temp_hold_duration)
-num_timesteps         = int(tf / 60 / 5)
-dt                    = tf / num_timesteps
+t0                        = 0.0
+temp_ramp_duration        = 3 * 60 * 60
+temp_long_hold_duration   = 3 * 60 * 60
+temp_short_hold_duration  = 1 * 60 * 60
+num_cycles                = 1
+total_cycle_length        = (2 * temp_ramp_duration + temp_long_hold_duration + temp_short_hold_duration)
+tf                        = num_cycles * total_cycle_length
+num_timesteps             = int(tf / 60 / 5)
+dt                        = tf / num_timesteps
 
 k_poly         = 12.6
 k_cer          = 120.0
@@ -74,7 +76,7 @@ final_temp     = 1200.0
 
 vf_cer_0       = 0.0          # initial ceramic volume fraction (=0.0 for the first pyrolysis cycle)
 vf_poly_0      = 1.0          # initial polymer volume fraction (=1.0 for the first pyrolysis cycle)
-a              = 0.05         # "void formation ratio of the precursor", value is not mentioned in the Zhang paper
+a              = 0.2         # "void formation ratio of the precursor", value is not mentioned in the Zhang paper
 
 # taken from the Zhang paper 
 
@@ -162,7 +164,8 @@ class MaterialState:
 
         self.S = fem.functionspace(domain, ("Lagrange", 1))
 
-        self.r     = fem.Function(self.S, name="r")
+        self.r_old = fem.Function(self.S, name="r_old")
+        self.r_new = fem.Function(self.S, name="r_new")
         self.k     = fem.Function(self.S, name="k")
         self.cp    = fem.Function(self.S, name="cp")
         self.alpha = fem.Function(self.S, name="alpha")
@@ -171,6 +174,10 @@ class MaterialState:
         self.nu    = fem.Function(self.S, name="nu")
         self.mu    = fem.Function(self.S, name="mu")
         self.lam   = fem.Function(self.S, name="lam")
+        
+        self.vf_cer  = 0
+        self.vf_void = 0
+        self.vf_poly = 0
 
     def rule_of_mixtures_matrix(self, prop_poly, vf_poly, prop_cer, vf_cer):
         return prop_poly * vf_poly + prop_cer * vf_cer
@@ -179,24 +186,25 @@ class MaterialState:
         vf_matrix = 1.0 - self.vf_fib
         return vf_matrix * prop_matrix + self.vf_fib * prop_fib
     
-    def update(self, r_old, temp, dt):
+    def update(self, r_old, temp, dt, vf_poly_0, vf_cer_0):
 
-        r_new = (A_factor * np.exp(-E_a / (R_gas * (temp + 273.15))) * (1.0 - r_old) ** n * dt + r_old)
+        r_step = (A_factor * np.exp(-E_a / (R_gas * (temp + 273.15))) * (1.0 - r_old) ** n * dt + r_old)
+        if (r_step >= r_old).all():
+            r_new = r_step
 
-        vf_cer  = (1 - a) * r_new * vf_poly_0
-        vf_void = a * r_new * vf_poly_0
-        vf_poly = 1.0 - vf_cer - vf_cer_0 - vf_void
+        self.vf_cer  = (1 - a) * r_new * vf_poly_0 + vf_cer_0
+        self.vf_void = a * r_new * vf_poly_0
+        self.vf_poly = 1.0 - self.vf_cer - self.vf_void
 
-        k_m      = self.rule_of_mixtures_matrix(self.polymer.k, vf_poly, self.ceramic.k, vf_cer)
-        cp_m     = self.rule_of_mixtures_matrix(self.polymer.cp, vf_poly, self.ceramic.cp, vf_cer)
-        alpha_m  = self.rule_of_mixtures_matrix(self.polymer.alpha, vf_poly, self.ceramic.alpha, vf_cer)
-        rho_m    = self.rule_of_mixtures_matrix(self.polymer.rho, vf_poly, self.ceramic.rho, vf_cer)
-        E_m      = self.rule_of_mixtures_matrix(self.polymer.E, vf_poly, self.ceramic.E, vf_cer)
-        nu_m     = self.rule_of_mixtures_matrix(self.polymer.nu, vf_poly, self.ceramic.nu, vf_cer)
-        mu_m     = self.rule_of_mixtures_matrix(self.polymer.mu, vf_poly, self.ceramic.mu, vf_cer)
-        lam_m    = self.rule_of_mixtures_matrix(self.polymer.lam, vf_poly, self.ceramic.lam, vf_cer)
+        k_m      = self.rule_of_mixtures_matrix(self.polymer.k, self.vf_poly, self.ceramic.k, self.vf_cer)
+        cp_m     = self.rule_of_mixtures_matrix(self.polymer.cp, self.vf_poly, self.ceramic.cp, self.vf_cer)
+        alpha_m  = self.rule_of_mixtures_matrix(self.polymer.alpha, self.vf_poly, self.ceramic.alpha, self.vf_cer)
+        rho_m    = self.rule_of_mixtures_matrix(self.polymer.rho, self.vf_poly, self.ceramic.rho, self.vf_cer)
+        E_m      = self.rule_of_mixtures_matrix(self.polymer.E, self.vf_poly, self.ceramic.E, self.vf_cer)
+        nu_m     = self.rule_of_mixtures_matrix(self.polymer.nu, self.vf_poly, self.ceramic.nu, self.vf_cer)
 
-        self.r.x.array[:]     = r_new
+        self.r_old.x.array[:] = r_old
+        self.r_new.x.array[:] = r_new
         self.k.x.array[:]     = self.rule_of_mixtures_total(k_m,  self.fiber.k)
         self.cp.x.array[:]    = self.rule_of_mixtures_total(cp_m, self.fiber.cp)
         self.alpha.x.array[:] = self.rule_of_mixtures_total(alpha_m,  self.fiber.alpha)
@@ -204,10 +212,10 @@ class MaterialState:
 
         self.E.x.array[:]   = E_m
         self.nu.x.array[:]  = nu_m
-        self.mu.x.array[:]  = mu_m
-        self.lam.x.array[:] = lam_m
+        self.mu.x.array[:]  = E_m / (2.0 * (1.0 + nu_m))
+        self.lam.x.array[:] = E_m * nu_m / ((1.0 + nu_m) * (1.0 - 2.0 * nu_m))
 
-        for f in (self.r, self.k, self.cp, self.alpha, self.rho,
+        for f in (self.r_new, self.k, self.cp, self.alpha, self.rho,
                 self.E, self.nu, self.mu, self.lam):
             f.x.scatter_forward()
 
@@ -228,11 +236,14 @@ with XDMFFile(MPI.COMM_WORLD, "mesh/rve_3D.xdmf", "r") as xdmf:
 u_temp_prev.interpolate(lambda x: np.full(x.shape[1], initial_temp, dtype=default_scalar_type)) # is interpolate necessary
 delta_temp = u_temp_prev - initial_temp
 
-material_state.update(material_state.r.x.array, u_temp_prev.x.array, dt)
+material_state.update(material_state.r_new.x.array, u_temp_prev.x.array, dt, vf_poly_0, vf_cer_0)
 mpc, bcs_disp_unit_cell = get_mpc(domain_unit_cell)
+
+previous_beta = fem.Constant(domain_unit_cell, 0.0)
 stiffness_tensor_homogenized = fem.Constant(domain_unit_cell, np.zeros((6, 6), dtype=default_scalar_type))
+eigenstrain_homogenized_previous = fem.Constant(domain_unit_cell, np.zeros(6, dtype=default_scalar_type))
 eigenstrain_homogenized = fem.Constant(domain_unit_cell, np.zeros(6, dtype=default_scalar_type))
-solve_unit_cell(domain_unit_cell, cell_tags_unit_cell, material_state, mpc, bcs_disp_unit_cell, u_temp_prev, stiffness_tensor_homogenized, eigenstrain_homogenized)
+solve_unit_cell(domain_unit_cell, cell_tags_unit_cell, material_state, mpc, bcs_disp_unit_cell, u_temp_prev, previous_beta, stiffness_tensor_homogenized, eigenstrain_homogenized)
 
 
 ##======================================##
@@ -310,7 +321,7 @@ def P_eigenstrain(eig, C):
     return ufl.dot(C, eig)
 
 a_disp = ufl.inner(epsilon_sym(v_disp_current), P_tot(u_disp_current, stiffness_tensor_homogenized)) * dx
-L_disp = ufl.inner(epsilon_sym(v_disp_current), P_eigenstrain(eigenstrain_homogenized, stiffness_tensor_homogenized)) * dx
+L_disp = ufl.inner(epsilon_sym(v_disp_current), P_eigenstrain(eigenstrain_homogenized + eigenstrain_homogenized_previous, stiffness_tensor_homogenized)) * dx
 problem_disp = LinearProblem(a_disp, L_disp, bcs=[bcs_disp])
 
 
@@ -323,7 +334,7 @@ phi    = ufl.TrialFunction(S_constant)
 psi    = ufl.TestFunction(S_constant)
 a_proj = ufl.inner(phi, psi) * dx
 
-tot_stress_expr = P_tot(u_disp_current_store, stiffness_tensor_homogenized) - P_eigenstrain(eigenstrain_homogenized, stiffness_tensor_homogenized)       
+tot_stress_expr = P_tot(u_disp_current_store, stiffness_tensor_homogenized) - P_eigenstrain(eigenstrain_homogenized + eigenstrain_homogenized_previous, stiffness_tensor_homogenized)       
 von_mises_expr = ufl.sqrt(0.5 * ((tot_stress_expr[0] - tot_stress_expr[1])**2 +
                                  (tot_stress_expr[1] - tot_stress_expr[2])**2 +
                                  (tot_stress_expr[2] - tot_stress_expr[0])**2 +
@@ -340,11 +351,11 @@ problem_stress_projection = LinearProblem(a_proj, L_proj_von_mises, bcs=[])
 xdmf = io.XDMFFile(domain.comm, "results/results_3D.xdmf", "w")
 xdmf.write_mesh(domain)
 
-xdmf.write_function(u_temp_prev, t0)
-xdmf.write_function(u_disp_current_store, t0)
-xdmf.write_function(vm_stress_current, t0)
-xdmf.write_function(material_state.r, t0)
-xdmf.write_function(material_state.E, t0)
+# xdmf.write_function(u_temp_prev, t0)
+# xdmf.write_function(u_disp_current_store, t0)
+# xdmf.write_function(vm_stress_current, t0)
+# xdmf.write_function(material_state.r, t0)
+# xdmf.write_function(material_state.E, t0)
 
 
 ##======================================##
@@ -352,32 +363,32 @@ xdmf.write_function(material_state.E, t0)
 ##======================================##
 
 
-r_middle_point_values = []
-temp_middle_point_values = []
+r_avg_values = [np.mean(material_state.r_new.x.array[:])]
+temp_avg_values = [np.mean(u_temp_prev.x.array[:])]
+vf_poly_avg_values = [np.mean(material_state.vf_poly)]
+vf_cer_avg_values = [np.mean(material_state.vf_cer)]
+vf_void_avg_values = [np.mean(material_state.vf_void)]
+E_avg_values = [1 / np.linalg.inv(stiffness_tensor_homogenized.value)[0,0]]
+time_vector = np.zeros(num_timesteps + 1)
 
 t = t0 + dt
 
+old_cycle = 0
+
 for i in trange(num_timesteps, colour="blue", desc="  Time Stepping", position=0, bar_format='{l_bar}{bar:30}{r_bar}', total=num_timesteps):
-    
-    ##================================================##
-    ##=== CALCULATE QUANTITIES AT THE CENTER POINT ===##
-    ##================================================##
-
-    r_middle_point    = material_state.r.x.array[len(material_state.r.x.array) // 2]
-    temp_middle_point = u_temp_prev.x.array[len(u_temp_prev.x.array) // 2]
-
-    r_middle_point_values.append(r_middle_point)
-    temp_middle_point_values.append(temp_middle_point)
 
     ##==========================================##
     ##=== SOLVE AND OUTPUT SOLUTION TO .xdmf ===##
     ##==========================================##
 
-    ramp_param = min(max(t / temp_ramp_duration, 0.0), 1.0)
-    temp_bc    = initial_temp + ramp_param * (final_temp - initial_temp)
-    boundary_temp.value = default_scalar_type(temp_bc)
+    current_cycle = np.floor(t / total_cycle_length)
 
-    current_cycle = np.floor(t / (tf /  num_cycles))
+    ramp_up_param = min((t - current_cycle * total_cycle_length) / temp_ramp_duration, 1.0)
+    ramp_down_param = max(min((max((t - current_cycle * total_cycle_length), (temp_ramp_duration + temp_long_hold_duration)) \
+                        - (temp_ramp_duration + temp_long_hold_duration))  / temp_ramp_duration, 1.0), 0.0)
+
+    temp_bc    = initial_temp + ramp_up_param * (final_temp - initial_temp) - ramp_down_param * (final_temp - initial_temp)
+    boundary_temp.value = default_scalar_type(temp_bc)
 
     num_its_temp, converged_temp = solver_temp.solve(u_temp_current)
     if not converged_temp:
@@ -405,11 +416,36 @@ for i in trange(num_timesteps, colour="blue", desc="  Time Stepping", position=0
         vm_stress_current.x.scatter_forward()
         xdmf.write_function(vm_stress_current, t)
 
-        xdmf.write_function(material_state.r, t)
+        xdmf.write_function(material_state.r_new, t)
         xdmf.write_function(material_state.E, t)
 
-    material_state.update(material_state.r.x.array, u_temp_prev.x.array, dt)
-    solve_unit_cell(domain_unit_cell, cell_tags_unit_cell, material_state, mpc, bcs_disp_unit_cell, u_temp_prev, stiffness_tensor_homogenized, eigenstrain_homogenized)
+    if current_cycle != old_cycle:
+        vf_poly_0 = material_state.vf_void
+        vf_cer_0  = material_state.vf_cer
+        material_state = MaterialState(domain, fiber, polymer, ceramic, vf_fib)
+        material_state.update(material_state.r_new.x.array, u_temp_prev.x.array, dt, vf_poly_0, vf_cer_0)
+        old_cycle = current_cycle
+    else:
+        material_state.update(material_state.r_new.x.array, u_temp_prev.x.array, dt, vf_poly_0, vf_cer_0)
+    solve_unit_cell(domain_unit_cell, cell_tags_unit_cell, material_state, mpc, bcs_disp_unit_cell, u_temp_prev, previous_beta, stiffness_tensor_homogenized, eigenstrain_homogenized)
+
+    ##=================================##
+    ##=== CALCULATE MEAN QUANTITIES ===##
+    ##=================================##
+
+    time_vector[i + 1] = t / 60 / 60
+    r_avg = np.mean(material_state.r_new.x.array[:])
+    temp_avg = np.mean(u_temp_prev.x.array[:])
+    vf_poly_avg = np.mean(material_state.vf_poly)
+    vf_cer_avg = np.mean(material_state.vf_cer)
+    vf_void_avg = np.mean(material_state.vf_void)
+
+    r_avg_values.append(r_avg)
+    temp_avg_values.append(temp_avg)
+    vf_poly_avg_values.append(vf_poly_avg)
+    vf_cer_avg_values.append(vf_cer_avg)
+    vf_void_avg_values.append(vf_void_avg)
+    E_avg_values.append(1 / np.linalg.inv(stiffness_tensor_homogenized.value)[0,0])
 
     t += dt
 
@@ -421,10 +457,55 @@ xdmf.close()
 ##===========================================##
 
 
-plt.figure()
-plt.plot(temp_middle_point_values, r_middle_point_values, marker='o', color='r')
-plt.xlabel('Temperature')
-plt.ylabel('r')
-plt.title('Ceramization Degree (r) vs Temperature', fontsize=16)
+plt.figure(1)
+plt.plot(time_vector[:-2], r_avg_values[:-2], marker='o', color='g')
+plt.xlabel('Time (hr)', fontsize=14)
+plt.ylabel('r', fontsize=14)
+plt.title('Ceramization Degree vs Time', fontsize=16)
 plt.grid(True)
-plt.savefig('results/r_vs_temperature.png')
+plt.savefig('results/r_vs_time.png')
+
+plt.figure(2)
+plt.plot(time_vector, temp_avg_values, marker='o', color='r')
+plt.xlabel('Time (hr)', fontsize=14)
+plt.ylabel('Temperature (C)', fontsize=14)
+plt.title('Temperature vs Time', fontsize=16)
+plt.grid(True)
+plt.savefig('results/temp_vs_time.png')
+
+plt.figure(3)
+plt.plot(time_vector, vf_poly_avg_values, color='green', linewidth = 3, label='Polymer Volume Fraction')
+plt.plot(time_vector, vf_cer_avg_values, color='orange', linewidth = 3, label='Ceramic Volume Fraction')
+plt.plot(time_vector, vf_void_avg_values, color='gray', linewidth = 3, label='Void Volume Fraction')
+plt.xlabel('Time (hr)', fontsize=14)
+plt.ylabel('Volume Fraction', fontsize=14)
+plt.title('Volume Fractions vs Time', fontsize=16)
+plt.legend(fontsize=12)
+plt.grid(True)
+plt.savefig('results/volume_fractions_vs_time.png')
+
+plt.figure(4)
+#make a single plot with E vs t on the left axis and temp vs t on the right axis
+
+ax1 = plt.gca()
+ax2 = ax1.twinx()
+
+ax1.plot(time_vector, E_avg_values, color='blue', linewidth=3, label='Elastic Modulus')
+ax2.plot(time_vector, temp_avg_values, color='red', linewidth=3, label='Temperature')
+
+ax1.set_xlabel('Time (hr)', fontsize=14)
+ax1.set_ylabel('Elastic Modulus (Pa)', fontsize=14)
+ax2.set_ylabel('Temperature (C)', fontsize=14)
+
+plt.title('Elastic Modulus and Temperature vs Time', fontsize=16)
+plt.grid(True)
+plt.savefig('results/E_and_temp_vs_time.png')
+
+plt.figure(5)
+ramp_up_end_index = int(temp_ramp_duration / dt)
+plt.plot(temp_avg_values[0:ramp_up_end_index], r_avg_values[0:ramp_up_end_index], marker='o', color='orange')
+plt.xlabel('Temperature (C)', fontsize=14)
+plt.ylabel('r', fontsize=14)
+plt.title('Ceramization Degree vs Temperature', fontsize=16)
+plt.grid(True)
+plt.savefig('results/r_vs_temp.png')
