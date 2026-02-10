@@ -32,17 +32,18 @@ if not os.path.exists("mesh"):
 
 save_every = 5
 
-vf_fib = 0.267 # hard coded
-
-t0                        = 0.0
-temp_ramp_duration        = 3 * 60 * 60
-temp_long_hold_duration   = 3 * 60 * 60
-temp_short_hold_duration  = 1 * 60 * 60
 num_cycles                = 1
-total_cycle_length        = (2 * temp_ramp_duration + temp_long_hold_duration + temp_short_hold_duration)
-tf                        = num_cycles * total_cycle_length
-num_timesteps             = int(tf / 60 / 5)
-dt                        = tf / num_timesteps
+temp_ramp_duration        = 3 * (60 * 60)
+temp_long_hold_duration   = 3 * (60 * 60)
+temp_short_hold_duration  = 1 * (60 * 60)
+
+total_cycle_length  = (2 * temp_ramp_duration + temp_long_hold_duration + temp_short_hold_duration)
+tf                  = num_cycles * total_cycle_length
+
+num_timesteps  = int(tf / 60 / 5)
+dt             = tf / num_timesteps
+
+vf_fib         = 0.267 # hard coded
 
 k_poly         = 12.6
 k_cer          = 120.0
@@ -63,22 +64,18 @@ E_poly         = 4.94e9    # updated
 E_cer          = 206.18e9  # updated
 E_fib          = 264.5e9
 
-# the Zhang paper didn't have poisson's ratios, so these are assumed
-
-nu_poly        = 0.3
-nu_cer         = 0.14
-nu_fib         = 0.14 
+nu_poly        = 0.3   # assumed
+nu_cer         = 0.14  # assumed
+nu_fib         = 0.14  # assumed
 
 initial_temp   = 0.0
 final_temp     = 1200.0
 
-# these values are also assumed 
-
 vf_cer_0       = 0.0          # initial ceramic volume fraction (=0.0 for the first pyrolysis cycle)
 vf_poly_0      = 1.0          # initial polymer volume fraction (=1.0 for the first pyrolysis cycle)
-a              = 0.2         # "void formation ratio of the precursor", value is not mentioned in the Zhang paper
+a              = 0.2          # "void formation ratio of the precursor", value is not mentioned in the Zhang paper
 
-# taken from the Zhang paper 
+# all taken from the Zhang paper 
 
 n              = 2
 A_factor       = 1.5795 / (60)
@@ -239,11 +236,11 @@ delta_temp = u_temp_prev - initial_temp
 material_state.update(material_state.r_new.x.array, u_temp_prev.x.array, dt, vf_poly_0, vf_cer_0)
 mpc, bcs_disp_unit_cell = get_mpc(domain_unit_cell)
 
-previous_beta = fem.Constant(domain_unit_cell, 0.0)
+beta_history = fem.Constant(domain_unit_cell, 0.0)
 stiffness_tensor_homogenized = fem.Constant(domain_unit_cell, np.zeros((6, 6), dtype=default_scalar_type))
-eigenstrain_homogenized_previous = fem.Constant(domain_unit_cell, np.zeros(6, dtype=default_scalar_type))
 eigenstrain_homogenized = fem.Constant(domain_unit_cell, np.zeros(6, dtype=default_scalar_type))
-solve_unit_cell(domain_unit_cell, cell_tags_unit_cell, material_state, mpc, bcs_disp_unit_cell, u_temp_prev, previous_beta, stiffness_tensor_homogenized, eigenstrain_homogenized)
+
+solve_unit_cell(domain_unit_cell, cell_tags_unit_cell, material_state, mpc, bcs_disp_unit_cell, u_temp_prev, beta_history, stiffness_tensor_homogenized, eigenstrain_homogenized)
 
 
 ##======================================##
@@ -321,7 +318,7 @@ def P_eigenstrain(eig, C):
     return ufl.dot(C, eig)
 
 a_disp = ufl.inner(epsilon_sym(v_disp_current), P_tot(u_disp_current, stiffness_tensor_homogenized)) * dx
-L_disp = ufl.inner(epsilon_sym(v_disp_current), P_eigenstrain(eigenstrain_homogenized + eigenstrain_homogenized_previous, stiffness_tensor_homogenized)) * dx
+L_disp = ufl.inner(epsilon_sym(v_disp_current), P_eigenstrain(eigenstrain_homogenized, stiffness_tensor_homogenized)) * dx
 problem_disp = LinearProblem(a_disp, L_disp, bcs=[bcs_disp])
 
 
@@ -334,7 +331,7 @@ phi    = ufl.TrialFunction(S_constant)
 psi    = ufl.TestFunction(S_constant)
 a_proj = ufl.inner(phi, psi) * dx
 
-tot_stress_expr = P_tot(u_disp_current_store, stiffness_tensor_homogenized) - P_eigenstrain(eigenstrain_homogenized + eigenstrain_homogenized_previous, stiffness_tensor_homogenized)       
+tot_stress_expr = P_tot(u_disp_current_store, stiffness_tensor_homogenized) - P_eigenstrain(eigenstrain_homogenized, stiffness_tensor_homogenized)       
 von_mises_expr = ufl.sqrt(0.5 * ((tot_stress_expr[0] - tot_stress_expr[1])**2 +
                                  (tot_stress_expr[1] - tot_stress_expr[2])**2 +
                                  (tot_stress_expr[2] - tot_stress_expr[0])**2 +
@@ -351,11 +348,11 @@ problem_stress_projection = LinearProblem(a_proj, L_proj_von_mises, bcs=[])
 xdmf = io.XDMFFile(domain.comm, "results/results_3D.xdmf", "w")
 xdmf.write_mesh(domain)
 
-# xdmf.write_function(u_temp_prev, t0)
-# xdmf.write_function(u_disp_current_store, t0)
-# xdmf.write_function(vm_stress_current, t0)
-# xdmf.write_function(material_state.r, t0)
-# xdmf.write_function(material_state.E, t0)
+xdmf.write_function(u_temp_prev, 0.0)
+xdmf.write_function(u_disp_current_store, 0.0)
+xdmf.write_function(vm_stress_current, 0.0)
+xdmf.write_function(material_state.r_new, 0.0)
+xdmf.write_function(material_state.E, 0.0)
 
 
 ##======================================##
@@ -371,15 +368,15 @@ vf_void_avg_values = [np.mean(material_state.vf_void)]
 E_avg_values = [1 / np.linalg.inv(stiffness_tensor_homogenized.value)[0,0]]
 time_vector = np.zeros(num_timesteps + 1)
 
-t = t0 + dt
+t = dt
 
 old_cycle = 0
 
 for i in trange(num_timesteps, colour="blue", desc="  Time Stepping", position=0, bar_format='{l_bar}{bar:30}{r_bar}', total=num_timesteps):
 
-    ##==========================================##
-    ##=== SOLVE AND OUTPUT SOLUTION TO .xdmf ===##
-    ##==========================================##
+    ##=============================================================================##
+    ##=== CALCULATE THE APPLIED TEMPERATURE BASED ON WHERE IN EACH CYCLE WE ARE ===##
+    ##=============================================================================##
 
     current_cycle = np.floor(t / total_cycle_length)
 
@@ -389,6 +386,10 @@ for i in trange(num_timesteps, colour="blue", desc="  Time Stepping", position=0
 
     temp_bc    = initial_temp + ramp_up_param * (final_temp - initial_temp) - ramp_down_param * (final_temp - initial_temp)
     boundary_temp.value = default_scalar_type(temp_bc)
+
+    ##==========================================##
+    ##=== SOLVE AND OUTPUT SOLUTION TO .xdmf ===##
+    ##==========================================##
 
     num_its_temp, converged_temp = solver_temp.solve(u_temp_current)
     if not converged_temp:
@@ -419,6 +420,10 @@ for i in trange(num_timesteps, colour="blue", desc="  Time Stepping", position=0
         xdmf.write_function(material_state.r_new, t)
         xdmf.write_function(material_state.E, t)
 
+    ##=========================================================================================##
+    ##=== UPDATE THE HOMOGENIZED PROPERTIES AND "RESET" THE MATERIAL STATE AFTER EACH CYCLE ===##
+    ##=========================================================================================##
+
     if current_cycle != old_cycle:
         vf_poly_0 = material_state.vf_void
         vf_cer_0  = material_state.vf_cer
@@ -427,11 +432,12 @@ for i in trange(num_timesteps, colour="blue", desc="  Time Stepping", position=0
         old_cycle = current_cycle
     else:
         material_state.update(material_state.r_new.x.array, u_temp_prev.x.array, dt, vf_poly_0, vf_cer_0)
-    solve_unit_cell(domain_unit_cell, cell_tags_unit_cell, material_state, mpc, bcs_disp_unit_cell, u_temp_prev, previous_beta, stiffness_tensor_homogenized, eigenstrain_homogenized)
 
-    ##=================================##
-    ##=== CALCULATE MEAN QUANTITIES ===##
-    ##=================================##
+    solve_unit_cell(domain_unit_cell, cell_tags_unit_cell, material_state, mpc, bcs_disp_unit_cell, u_temp_prev, beta_history, stiffness_tensor_homogenized, eigenstrain_homogenized)
+
+    ##==============================================##
+    ##=== CALCULATE MEAN QUANTITIES FOR PLOTTING ===##
+    ##==============================================##
 
     time_vector[i + 1] = t / 60 / 60
     r_avg = np.mean(material_state.r_new.x.array[:])
@@ -485,14 +491,10 @@ plt.grid(True)
 plt.savefig('results/volume_fractions_vs_time.png')
 
 plt.figure(4)
-#make a single plot with E vs t on the left axis and temp vs t on the right axis
-
 ax1 = plt.gca()
 ax2 = ax1.twinx()
-
 ax1.plot(time_vector, E_avg_values, color='blue', linewidth=3, label='Elastic Modulus')
 ax2.plot(time_vector, temp_avg_values, color='red', linewidth=3, label='Temperature')
-
 ax1.set_xlabel('Time (hr)', fontsize=14)
 ax1.set_ylabel('Elastic Modulus (Pa)', fontsize=14)
 ax2.set_ylabel('Temperature (C)', fontsize=14)
