@@ -30,17 +30,17 @@ if not os.path.exists("mesh"):
 ##======================================##
 
 
-save_every = 5
+save_every = 4
 
 num_cycles                = 8
 temp_ramp_duration        = 3 * (60 * 60)
 temp_long_hold_duration   = 3 * (60 * 60)
-temp_short_hold_duration  = 0 * (60 * 60)
+temp_short_hold_duration  = 0.5 * (60 * 60)
 
 total_cycle_length  = (2 * temp_ramp_duration + temp_long_hold_duration + temp_short_hold_duration)
 tf                  = num_cycles * total_cycle_length
 
-num_timesteps  = int(tf / 60 / 20)
+num_timesteps  = int(tf / 60 / 8)
 dt             = tf / num_timesteps
 
 vf_fib         = 0.54 # hard coded
@@ -74,18 +74,20 @@ nu12_fib       = 0.14
 nu13_fib       = 0.26  
 nu23_fib       = 0.26  
 
-initial_temp   = 0.0
+initial_temp   = 100.0
 final_temp     = 1200.0
 
-vf_cer_0       = 0.0          # initial ceramic volume fraction (=0.0 for the first pyrolysis cycle)
-vf_poly_0      = 1.0          # initial polymer volume fraction (=1.0 for the first pyrolysis cycle)
-a              = 0.1          # "void formation ratio of the precursor", value is not mentioned in the Zhang paper
+vf_cer_0           = 0.0                        # initial ceramic volume fraction (=0.0 for the first pyrolysis cycle)
+vf_poly_0          = 0.8                        # initial polymer volume fraction (=1.0 for the first pyrolysis cycle)
+vf_void_0          = 1 - vf_poly_0 - vf_cer_0   # initial void volume fraction
+a                  = 0.7                        # "void formation ratio of the precursor", value is not mentioned in the Zhang paper
+infiltration_ratio = 0.8                        # ratio of how much of the void volume fraction gets filled by polymer 
 
 # all taken from the Zhang paper 
 
 n              = 2
-A_factor       = 1.5795 / (60)
-E_a            = 18216.0
+A_factor       = 1.5795
+E_a            = 18.216e3
 R_gas          = 8.3145
 
 
@@ -202,14 +204,16 @@ class MaterialState:
         vf_matrix = 1.0 - self.vf_fib
         return vf_matrix * prop_matrix + self.vf_fib * prop_fib
     
-    def update(self, r_old, temp, dt, vf_poly_0, vf_cer_0):
+    def update(self, r_old, temp, dt, vf_poly_0, vf_cer_0, vf_void_0):
 
-        r_step = (A_factor * np.exp(-E_a / (R_gas * (temp + 273.15))) * (1.0 - r_old) ** n * dt + r_old)
+        r_step = (A_factor * np.exp(-E_a / (R_gas * temp)) * (1.0 - r_old) ** n) * dt + r_old
+        if (r_step > 1.0).any():
+            raise ValueError("The ceramization degree cannot exceed 1.0. Consider reducing the timestep.")
         if (r_step >= r_old).all():
             r_new = r_step
 
         self.vf_cer  = (1 - a) * r_new * vf_poly_0 + vf_cer_0
-        self.vf_void = a * r_new * vf_poly_0
+        self.vf_void = a * r_new * vf_poly_0 + vf_void_0
         self.vf_poly = 1.0 - self.vf_cer - self.vf_void
 
         k_m      = self.rule_of_mixtures_matrix(self.polymer.k, self.vf_poly, self.ceramic.k, self.vf_cer)
@@ -265,7 +269,7 @@ with XDMFFile(MPI.COMM_WORLD, "mesh/rve_3D.xdmf", "r") as xdmf:
 u_temp_prev.interpolate(lambda x: np.full(x.shape[1], initial_temp, dtype=default_scalar_type)) # is interpolate necessary
 delta_temp = u_temp_prev - initial_temp
 
-material_state.update(material_state.r_new.x.array, u_temp_prev.x.array, dt, vf_poly_0, vf_cer_0)
+material_state.update(material_state.r_new.x.array, u_temp_prev.x.array, dt, vf_poly_0, vf_cer_0, vf_void_0)
 mpc, bcs_disp_unit_cell = get_mpc(domain_unit_cell)
 
 beta_history = fem.Constant(domain_unit_cell, 0.0)
@@ -452,13 +456,14 @@ for i in trange(num_timesteps, colour="blue", desc="  Time Stepping", position=0
     ##=========================================================================================##
 
     if current_cycle != old_cycle:
-        vf_poly_0 = material_state.vf_void
+        vf_poly_0 = infiltration_ratio * material_state.vf_void
+        vf_void_0 = (1 - infiltration_ratio) * material_state.vf_void
         vf_cer_0  = material_state.vf_cer
         material_state = MaterialState(domain, fiber, polymer, ceramic, vf_fib)
-        material_state.update(material_state.r_new.x.array, u_temp_prev.x.array, dt, vf_poly_0, vf_cer_0)
+        material_state.update(material_state.r_new.x.array, u_temp_prev.x.array, dt, vf_poly_0, vf_cer_0, vf_void_0)
         old_cycle = current_cycle
     else:
-        material_state.update(material_state.r_new.x.array, u_temp_prev.x.array, dt, vf_poly_0, vf_cer_0)
+        material_state.update(material_state.r_new.x.array, u_temp_prev.x.array, dt, vf_poly_0, vf_cer_0, vf_void_0)
 
     solve_unit_cell(domain_unit_cell, cell_tags_unit_cell, material_state, mpc, bcs_disp_unit_cell, u_temp_prev, beta_history, stiffness_tensor_homogenized, eigenstrain_homogenized)
 
@@ -515,6 +520,7 @@ plt.ylabel('Volume Fraction', fontsize=14)
 plt.title('Volume Fractions vs Time', fontsize=16)
 plt.legend(fontsize=12)
 plt.grid(True)
+plt.ylim([0,1])
 plt.savefig('results/volume_fractions_vs_time.png')
 
 plt.figure(4)

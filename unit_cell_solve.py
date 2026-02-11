@@ -100,7 +100,7 @@ def solve_unit_cell(domain, cell_tags, material_state, mpc, bcs_disp, u_temp_pre
     a_k = 0.0
     L_k = 0.0
 
-    delta_temp_value = u_temp_prev.x.array[:].mean() - 0.0 # hard coded
+    delta_temp_value = u_temp_prev.x.array[:].mean() - 100.0 # hard coded (check later !)
     delta_temp = fem.Constant(domain, delta_temp_value)
     beta_current = get_beta(r_new_avg, r_old_avg)
 
