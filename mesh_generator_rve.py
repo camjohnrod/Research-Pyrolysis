@@ -2,6 +2,7 @@ import os
 import sys
 import gmsh
 import meshio
+import numpy as np
 
 # ================================================================
 # User Input Parameters
@@ -17,10 +18,14 @@ cy = Ly / 2     # circle center y
 r  = 7e-6     # radius
 
 # --- Mesh controls ---
-n_outer = 10      # divisions on outer edges
-n_inner = 10      # divisions on fiber–matrix connectors
-nz      = 3       # number of layers in z extrusion
+n_outer = 6      # divisions on outer edges
+n_inner = 6      # divisions on fiber–matrix connectors
+nz      = 4       # number of layers in z extrusion
 thick   = Lx      # extrusion thickness
+
+fiber_volume = np.pi * r ** 2 * thick
+total_volume = Lx * Ly * thick
+vf = fiber_volume / total_volume
 
 # ================================================================
 # Initialize
@@ -154,6 +159,9 @@ gmsh.model.setPhysicalName(2, 4, "top")
 
 gmsh.model.mesh.generate(3)
 gmsh.write("mesh/rve_3D.msh")
+
+print(f"\nFiber volme fraction: ", vf)
+print("\n")
 
 gmsh.fltk.run()
 
