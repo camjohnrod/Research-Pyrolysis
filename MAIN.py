@@ -32,18 +32,18 @@ if not os.path.exists("mesh"):
 
 save_every = 5
 
-num_cycles                = 1
+num_cycles                = 8
 temp_ramp_duration        = 3 * (60 * 60)
 temp_long_hold_duration   = 3 * (60 * 60)
-temp_short_hold_duration  = 1 * (60 * 60)
+temp_short_hold_duration  = 0 * (60 * 60)
 
 total_cycle_length  = (2 * temp_ramp_duration + temp_long_hold_duration + temp_short_hold_duration)
 tf                  = num_cycles * total_cycle_length
 
-num_timesteps  = int(tf / 60 / 5)
+num_timesteps  = int(tf / 60 / 20)
 dt             = tf / num_timesteps
 
-vf_fib         = 0.267 # hard coded
+vf_fib         = 0.54 # hard coded
 
 k_poly         = 12.6
 k_cer          = 120.0
@@ -62,18 +62,24 @@ rho_fib        = 1780
 
 E_poly         = 4.94e9    # updated
 E_cer          = 206.18e9  # updated
-E_fib          = 264.5e9
 
-nu_poly        = 0.3   # assumed
-nu_cer         = 0.14  # assumed
-nu_fib         = 0.14  # assumed
+nu_poly        = 0.3   
+nu_cer         = 0.14  
+
+E1_fib         = 264.5e9   
+E2_fib         = 13.8e9
+E3_fib         = 13.8e9
+
+nu12_fib       = 0.14  
+nu13_fib       = 0.26  
+nu23_fib       = 0.26  
 
 initial_temp   = 0.0
 final_temp     = 1200.0
 
 vf_cer_0       = 0.0          # initial ceramic volume fraction (=0.0 for the first pyrolysis cycle)
 vf_poly_0      = 1.0          # initial polymer volume fraction (=1.0 for the first pyrolysis cycle)
-a              = 0.2          # "void formation ratio of the precursor", value is not mentioned in the Zhang paper
+a              = 0.1          # "void formation ratio of the precursor", value is not mentioned in the Zhang paper
 
 # all taken from the Zhang paper 
 
@@ -129,20 +135,28 @@ class MaterialConstants:
     cp: float
     alpha: float
     rho: float
-    E: float
-    nu: float
+    E1: float
+    E2: float
+    E3: float
+    nu12: float
+    nu13: float
+    nu23: float
+    
+    @property
+    def G12(self) -> float:
+        return self.E1 / (2.0 * (1.0 + self.nu12))
 
     @property
-    def mu(self) -> float:
-        return self.E / (2.0 * (1.0 + self.nu))
+    def G13(self) -> float:
+        return self.E1 / (2.0 * (1.0 + self.nu13))
 
     @property
-    def lam(self) -> float:
-        return self.E * self.nu / ((1.0 + self.nu) * (1.0 - 2.0 * self.nu))
+    def G23(self) -> float:
+        return self.E2 / (2.0 * (1.0 + self.nu23))
 
-fiber   = MaterialConstants(k_fib, cp_fib, alpha_fib, rho_fib, E_fib, nu_fib)
-polymer = MaterialConstants(k_poly, cp_poly, alpha_mat, rho_poly, E_poly, nu_poly)
-ceramic = MaterialConstants(k_cer, cp_cer, alpha_mat, rho_cer, E_cer, nu_cer)
+fiber   = MaterialConstants(k_fib, cp_fib, alpha_fib, rho_fib, E1_fib, E2_fib, E3_fib, nu12_fib, nu13_fib, nu23_fib)
+polymer = MaterialConstants(k_poly, cp_poly, alpha_mat, rho_poly, E_poly, E_poly, E_poly, nu_poly, nu_poly, nu_poly)
+ceramic = MaterialConstants(k_cer, cp_cer, alpha_mat, rho_cer, E_cer, E_cer, E_cer, nu_cer, nu_cer, nu_cer)
 
 class MaterialState:
     def __init__(
@@ -167,11 +181,16 @@ class MaterialState:
         self.cp    = fem.Function(self.S, name="cp")
         self.alpha = fem.Function(self.S, name="alpha")
         self.rho   = fem.Function(self.S, name="rho")
-        self.E     = fem.Function(self.S, name="E")
-        self.nu    = fem.Function(self.S, name="nu")
-        self.mu    = fem.Function(self.S, name="mu")
-        self.lam   = fem.Function(self.S, name="lam")
-        
+        self.E1    = fem.Function(self.S, name="E1")
+        self.E2    = fem.Function(self.S, name="E2")
+        self.E3    = fem.Function(self.S, name="E3")
+        self.nu12  = fem.Function(self.S, name="nu12")
+        self.nu13  = fem.Function(self.S, name="nu13")
+        self.nu23  = fem.Function(self.S, name="nu23")
+        self.G12   = fem.Function(self.S, name="G12")
+        self.G13   = fem.Function(self.S, name="G13")
+        self.G23   = fem.Function(self.S, name="G23")
+
         self.vf_cer  = 0
         self.vf_void = 0
         self.vf_poly = 0
@@ -197,9 +216,18 @@ class MaterialState:
         cp_m     = self.rule_of_mixtures_matrix(self.polymer.cp, self.vf_poly, self.ceramic.cp, self.vf_cer)
         alpha_m  = self.rule_of_mixtures_matrix(self.polymer.alpha, self.vf_poly, self.ceramic.alpha, self.vf_cer)
         rho_m    = self.rule_of_mixtures_matrix(self.polymer.rho, self.vf_poly, self.ceramic.rho, self.vf_cer)
-        E_m      = self.rule_of_mixtures_matrix(self.polymer.E, self.vf_poly, self.ceramic.E, self.vf_cer)
-        nu_m     = self.rule_of_mixtures_matrix(self.polymer.nu, self.vf_poly, self.ceramic.nu, self.vf_cer)
+        E1_m      = self.rule_of_mixtures_matrix(self.polymer.E1, self.vf_poly, self.ceramic.E1, self.vf_cer)
+        E2_m      = self.rule_of_mixtures_matrix(self.polymer.E2, self.vf_poly, self.ceramic.E2, self.vf_cer)
+        E3_m      = self.rule_of_mixtures_matrix(self.polymer.E3, self.vf_poly, self.ceramic.E3, self.vf_cer)
+        nu12_m    = self.rule_of_mixtures_matrix(self.polymer.nu12, self.vf_poly, self.ceramic.nu12, self.vf_cer)
+        nu13_m    = self.rule_of_mixtures_matrix(self.polymer.nu13, self.vf_poly, self.ceramic.nu13, self.vf_cer)
+        nu23_m    = self.rule_of_mixtures_matrix(self.polymer.nu23, self.vf_poly, self.ceramic.nu23, self.vf_cer)
 
+        G12_m     = E1_m / (2.0 * (1.0 + nu12_m))
+        G13_m     = E1_m / (2.0 * (1.0 + nu13_m))
+        G23_m     = E2_m / (2.0 * (1.0 + nu23_m))
+
+        # Update material properties
         self.r_old.x.array[:] = r_old
         self.r_new.x.array[:] = r_new
         self.k.x.array[:]     = self.rule_of_mixtures_total(k_m,  self.fiber.k)
@@ -207,19 +235,23 @@ class MaterialState:
         self.alpha.x.array[:] = self.rule_of_mixtures_total(alpha_m,  self.fiber.alpha)
         self.rho.x.array[:]   = self.rule_of_mixtures_total(rho_m,self.fiber.rho)
 
-        self.E.x.array[:]   = E_m
-        self.nu.x.array[:]  = nu_m
-        self.mu.x.array[:]  = E_m / (2.0 * (1.0 + nu_m))
-        self.lam.x.array[:] = E_m * nu_m / ((1.0 + nu_m) * (1.0 - 2.0 * nu_m))
+        self.E1.x.array[:]   = E1_m
+        self.E2.x.array[:]   = E2_m
+        self.E3.x.array[:]   = E3_m
+        self.nu12.x.array[:]  = nu12_m
+        self.nu13.x.array[:]  = nu13_m
+        self.nu23.x.array[:]  = nu23_m
+        self.G12.x.array[:]   = G12_m
+        self.G13.x.array[:]   = G13_m
+        self.G23.x.array[:]   = G23_m
 
         for f in (self.r_new, self.k, self.cp, self.alpha, self.rho,
-                self.E, self.nu, self.mu, self.lam):
+                self.E1, self.E2, self.E3, self.nu12, self.nu13, self.nu23, self.G12, self.G13, self.G23):
             f.x.scatter_forward()
 
         return r_new
 
 material_state = MaterialState(domain, fiber, polymer, ceramic, vf_fib)
-
 
 ##==============================================##
 ##=== CALCULATE STARTING MATERIAL PROPERTIES ===##
@@ -351,8 +383,6 @@ xdmf.write_mesh(domain)
 xdmf.write_function(u_temp_prev, 0.0)
 xdmf.write_function(u_disp_current_store, 0.0)
 xdmf.write_function(vm_stress_current, 0.0)
-xdmf.write_function(material_state.r_new, 0.0)
-xdmf.write_function(material_state.E, 0.0)
 
 
 ##======================================##
@@ -416,9 +446,6 @@ for i in trange(num_timesteps, colour="blue", desc="  Time Stepping", position=0
         vm_stress_current.name = "von Mises Stress"
         vm_stress_current.x.scatter_forward()
         xdmf.write_function(vm_stress_current, t)
-
-        xdmf.write_function(material_state.r_new, t)
-        xdmf.write_function(material_state.E, t)
 
     ##=========================================================================================##
     ##=== UPDATE THE HOMOGENIZED PROPERTIES AND "RESET" THE MATERIAL STATE AFTER EACH CYCLE ===##

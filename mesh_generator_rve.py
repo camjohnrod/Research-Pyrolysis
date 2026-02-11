@@ -17,18 +17,18 @@ Lz = 24e-6      # cross-section extent in z
 # --- Circular inclusion (in cross-section plane: y-z) ---
 cy = Ly / 2     # circle center y
 cz = Lz / 2     # circle center z
-r  = 7e-6     # radius
+r_real  = 10e-6  # radius
 
 # --- Mesh controls ---
 n_outer = 6      # divisions on outer edges
 n_inner = 6      # divisions on fiber–matrix connectors
 nz      = 4       # number of layers in extrusion
-thick   = Lx      # extrusion thickness (along x)
 
-fiber_volume = np.pi * r ** 2 * thick
-total_volume = Ly * Lz * thick
+fiber_volume = np.pi * r_real ** 2 * Lx
+total_volume = Ly * Lz * Lx
 vf = fiber_volume / total_volume
 
+r = r_real / (2 ** 0.5)
 # ================================================================
 # Initialize
 # ================================================================
@@ -120,7 +120,7 @@ gmsh.model.geo.synchronize()
 
 out = gmsh.model.geo.extrude(
     [(2, s1), (2, s2), (2, s3), (2, s4), (2, sf)],
-    thick, 0, 0,
+    Lx, 0, 0,
     numElements=[nz],
     recombine=True
 )

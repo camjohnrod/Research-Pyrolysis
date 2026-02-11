@@ -19,8 +19,15 @@ def solve_unit_cell(domain, cell_tags, material_state, mpc, bcs_disp, u_temp_pre
 
     unit_cell_volume = length * width * height
 
-    mu_avg       = fem.Constant(domain, np.mean(material_state.mu.x.array[:]))
-    lam_avg      = fem.Constant(domain, np.mean(material_state.lam.x.array[:]))
+    E1_avg       = np.mean(material_state.E1.x.array[:])
+    E2_avg       = np.mean(material_state.E2.x.array[:])
+    E3_avg       = np.mean(material_state.E3.x.array[:])
+    nu12_avg     = np.mean(material_state.nu12.x.array[:])
+    nu13_avg     = np.mean(material_state.nu13.x.array[:])
+    nu23_avg     = np.mean(material_state.nu23.x.array[:])
+    G12_avg      = np.mean(material_state.G12.x.array[:])
+    G13_avg      = np.mean(material_state.G13.x.array[:])
+    G23_avg      = np.mean(material_state.G23.x.array[:])
     alpha_avg    = fem.Constant(domain, np.mean(material_state.alpha.x.array[:]))
     vf_poly_avg  = fem.Constant(domain, np.mean(material_state.vf_poly))
     r_new_avg    = fem.Constant(domain, np.mean(material_state.r_new.x.array[:]))
@@ -59,15 +66,17 @@ def solve_unit_cell(domain, cell_tags, material_state, mpc, bcs_disp, u_temp_pre
     def epsilon_thermal(alpha, delta_temp):
         return get_voigt(alpha * delta_temp * I)
 
-    def get_stiffness_tensor(mu, lam):
-        C = ufl.as_matrix([[lam + 2 * mu,     lam,           lam,           0,              0,              0],
-                           [lam,           lam + 2 * mu,     lam,           0,              0,              0],
-                           [lam,               lam,       lam + 2 * mu,     0,              0,              0],
-                           [0,                 0,              0,          mu,              0,              0],
-                           [0,                 0,              0,           0,             mu,              0],
-                           [0,                 0,              0,           0,              0,             mu]])
-        return C
-
+    def get_stiffness_tensor(E1, E2, E3, nu12, nu13, nu23, G12, G13, G23):
+        S = np.array([[1 / E1, -nu12 / E1, -nu13 / E1, 0, 0, 0],
+                           [-nu12 / E1, 1 / E2, -nu23 / E2, 0, 0, 0],
+                           [-nu13 / E1, -nu23 / E2, 1 / E3, 0, 0, 0],
+                           [0, 0, 0, 1 / G23, 0, 0],
+                           [0, 0, 0, 0, 1 / G13, 0],
+                           [0, 0, 0, 0, 0, 1 / G12]])
+        C = np.linalg.inv(S)
+        C_ufl = fem.Constant(domain, C)
+        return C_ufl
+    
     applied_eps  = fem.Constant(domain, np.zeros((6)))
     applied_eps_ = fem.Constant(domain, np.zeros((6)))
 
@@ -78,10 +87,10 @@ def solve_unit_cell(domain, cell_tags, material_state, mpc, bcs_disp, u_temp_pre
 
     def P_tot(k, stiffness_matrix):
         return ufl.dot(stiffness_matrix, epsilon_sym(k))
-    
+
     material_properties = {
-        1: (material_state.fiber.mu, material_state.fiber.lam, material_state.fiber.alpha),
-        2: (mu_avg, lam_avg, alpha_avg)
+        1: (material_state.fiber.E1, material_state.fiber.E2, material_state.fiber.E3, material_state.fiber.nu12, material_state.fiber.nu13, material_state.fiber.nu23, material_state.fiber.G12, material_state.fiber.G13, material_state.fiber.G23, material_state.fiber.alpha),
+        2: (E1_avg, E2_avg, E3_avg, nu12_avg, nu13_avg, nu23_avg, G12_avg, G13_avg, G23_avg, alpha_avg)
     }
 
     dx = ufl.Measure("dx", domain=domain, subdomain_data=cell_tags)
@@ -95,8 +104,8 @@ def solve_unit_cell(domain, cell_tags, material_state, mpc, bcs_disp, u_temp_pre
     delta_temp = fem.Constant(domain, delta_temp_value)
     beta_current = get_beta(r_new_avg, r_old_avg)
 
-    for tag, (mu, lam, alpha) in material_properties.items():
-        stiffness_matrix = get_stiffness_tensor(mu, lam)
+    for tag, (E1, E2, E3, nu12, nu13, nu23, G12, G13, G23, alpha) in material_properties.items():
+        stiffness_matrix = get_stiffness_tensor(E1, E2, E3, nu12, nu13, nu23, G12, G13, G23)
         a_h_tag, L_h_tag = ufl.system(ufl.inner(P_tot_multiple_rhs(h, stiffness_matrix), epsilon_sym(h_)) * dx(tag))
         a_h += a_h_tag
         L_h += L_h_tag
@@ -133,15 +142,15 @@ def solve_unit_cell(domain, cell_tags, material_state, mpc, bcs_disp, u_temp_pre
             if ((i > 2) | (j > 2)) & (i != j):
                 continue
             applied_eps_.value = elementary_load[j]
-            for tag, (mu, lam, _) in material_properties.items():
-                stiffness_matrix = get_stiffness_tensor(mu, lam)
+            for tag, (E1, E2, E3, nu12, nu13, nu23, G12, G13, G23, alpha) in material_properties.items():
+                stiffness_matrix = get_stiffness_tensor(E1, E2, E3, nu12, nu13, nu23, G12, G13, G23)
                 temporary_tensor[i, j] += (1 / unit_cell_volume) * fem.assemble_scalar(fem.form(ufl.inner(P_tot_multiple_rhs(H_solve, stiffness_matrix), applied_eps_) * dx(tag)))
 
     stiffness_tensor_homogenized.value = temporary_tensor
 
     temporary_vector = np.zeros((dim_load))
-    for tag, (mu, lam, alpha) in material_properties.items():
-        stiffness_matrix = get_stiffness_tensor(mu, lam)
+    for tag, (E1, E2, E3, nu12, nu13, nu23, G12, G13, G23, alpha) in material_properties.items():
+        stiffness_matrix = get_stiffness_tensor(E1, E2, E3, nu12, nu13, nu23, G12, G13, G23)
         for j in range(dim_load):
             if j > 2:
                 continue
@@ -153,7 +162,7 @@ def solve_unit_cell(domain, cell_tags, material_state, mpc, bcs_disp, u_temp_pre
                 temporary_vector[j] += fem.assemble_scalar(fem.form(ufl.inner(ufl.dot(stiffness_matrix, epsilon_sym(K_solve)), applied_eps_) * dx(tag)))
                 temporary_vector[j] -= fem.assemble_scalar(fem.form(ufl.inner(ufl.dot(stiffness_matrix, epsilon_thermal(alpha, delta_temp)), applied_eps_) * dx(tag)))
                 
-    mu_bar = -(1 / unit_cell_volume) * np.linalg.inv(temporary_tensor) @ temporary_vector
-    eigenstrain_homogenized.value = mu_bar
+    eigenstrain_bar = -(1 / unit_cell_volume) * np.linalg.inv(temporary_tensor) @ temporary_vector
+    eigenstrain_homogenized.value = eigenstrain_bar
 
     beta_history.value += float(beta_current)
