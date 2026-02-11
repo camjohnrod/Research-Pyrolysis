@@ -8,23 +8,25 @@ import numpy as np
 # User Input Parameters
 # ================================================================
 
-# --- Outer square dimensions ---
-Lx = 24e-6      # width
-Ly = 24e-6      # height
+# --- Dimensions ---
+# Lx: extrusion length (along x). Ly, Lz: cross-section extents (y and z).
+Lx = 24e-6      # extrusion length (thickness in x direction)
+Ly = 24e-6      # cross-section extent in y
+Lz = 24e-6      # cross-section extent in z
 
-# --- Circular inclusion ---
-cx = Lx / 2     # circle center x
+# --- Circular inclusion (in cross-section plane: y-z) ---
 cy = Ly / 2     # circle center y
+cz = Lz / 2     # circle center z
 r  = 7e-6     # radius
 
 # --- Mesh controls ---
 n_outer = 6      # divisions on outer edges
 n_inner = 6      # divisions on fiber–matrix connectors
-nz      = 4       # number of layers in z extrusion
-thick   = Lx      # extrusion thickness
+nz      = 4       # number of layers in extrusion
+thick   = Lx      # extrusion thickness (along x)
 
 fiber_volume = np.pi * r ** 2 * thick
-total_volume = Lx * Ly * thick
+total_volume = Ly * Lz * thick
 vf = fiber_volume / total_volume
 
 # ================================================================
@@ -38,17 +40,18 @@ gmsh.model.add("rve_3D")
 # Geometry (same 2D setup)
 # ================================================================
 
+# Cross-section is in the y-z plane at x = 0
 p1 = gmsh.model.geo.addPoint(0,   0,   0, 1.0)
-p2 = gmsh.model.geo.addPoint(Lx,  0,   0, 1.0)
-p3 = gmsh.model.geo.addPoint(0,   Ly,  0, 1.0)
-p4 = gmsh.model.geo.addPoint(Lx,  Ly,  0, 1.0)
+p2 = gmsh.model.geo.addPoint(0,   Ly,  0, 1.0)
+p3 = gmsh.model.geo.addPoint(0,   0,   Lz, 1.0)
+p4 = gmsh.model.geo.addPoint(0,   Ly,  Lz, 1.0)
 
-# Fiber quadrants
-p5 = gmsh.model.geo.addPoint(cx - r, cy - r, 0, 1.0)
-p6 = gmsh.model.geo.addPoint(cx + r, cy - r, 0, 1.0)
-p7 = gmsh.model.geo.addPoint(cx + r, cy + r, 0, 1.0)
-p8 = gmsh.model.geo.addPoint(cx - r, cy + r, 0, 1.0)
-pc = gmsh.model.geo.addPoint(cx, cy, 0, 1.0)
+# Fiber quadrants (y,z around center)
+p5 = gmsh.model.geo.addPoint(0, cy - r, cz - r, 1.0)
+p6 = gmsh.model.geo.addPoint(0, cy + r, cz - r, 1.0)
+p7 = gmsh.model.geo.addPoint(0, cy + r, cz + r, 1.0)
+p8 = gmsh.model.geo.addPoint(0, cy - r, cz + r, 1.0)
+pc = gmsh.model.geo.addPoint(0, cy, cz, 1.0)
 
 # Outer lines
 l1 = gmsh.model.geo.addLine(p1, p3)
@@ -117,7 +120,7 @@ gmsh.model.geo.synchronize()
 
 out = gmsh.model.geo.extrude(
     [(2, s1), (2, s2), (2, s3), (2, s4), (2, sf)],
-    0, 0, thick,
+    thick, 0, 0,
     numElements=[nz],
     recombine=True
 )
@@ -144,14 +147,14 @@ gmsh.model.setPhysicalName(3, 1, "fiber")
 gmsh.model.addPhysicalGroup(3, matrix_volumes, 2)
 gmsh.model.setPhysicalName(3, 2, "matrix")
 
-# Bottom surface physical group (z = 0)
+# Start face physical group (x = 0)
 gmsh.model.addPhysicalGroup(2, [s1, s2, s3, s4, sf], 3)
-gmsh.model.setPhysicalName(2, 3, "bottom")
+gmsh.model.setPhysicalName(2, 3, "start")
 
-# Top surfaces (extract from extrusion)
+# End face surfaces (extracted from extrusion)
 top_surfs = [entity[1] for entity in out if entity[0] == 2]
 gmsh.model.addPhysicalGroup(2, top_surfs, 4)
-gmsh.model.setPhysicalName(2, 4, "top")
+gmsh.model.setPhysicalName(2, 4, "end")
 
 # ================================================================
 # Mesh Generation
@@ -160,7 +163,7 @@ gmsh.model.setPhysicalName(2, 4, "top")
 gmsh.model.mesh.generate(3)
 gmsh.write("mesh/rve_3D.msh")
 
-print(f"\nFiber volme fraction: ", vf)
+print(f"\nFiber volume fraction: ", vf)
 print("\n")
 
 gmsh.fltk.run()
