@@ -93,6 +93,12 @@ def solve_unit_cell(domain, cell_tags, material_state, mpc, bcs_disp, u_temp_pre
         2: (E1_avg, E2_avg, E3_avg, nu12_avg, nu13_avg, nu23_avg, G12_avg, G13_avg, G23_avg, alpha_avg)
     }
 
+    stiffness_matrices = {}
+    for tag, props in material_properties.items():
+        E1_p, E2_p, E3_p, nu12_p, nu13_p, nu23_p, G12_p, G13_p, G23_p, _alpha_p = props
+        stiffness_matrices[tag] = get_stiffness_tensor(E1_p, E2_p, E3_p, nu12_p, nu13_p, nu23_p, G12_p, G13_p, G23_p)
+
+
     dx = ufl.Measure("dx", domain=domain, subdomain_data=cell_tags)
 
     a_h = 0.0
@@ -105,7 +111,7 @@ def solve_unit_cell(domain, cell_tags, material_state, mpc, bcs_disp, u_temp_pre
     beta_current = get_beta(r_new_avg, r_old_avg)
 
     for tag, (E1, E2, E3, nu12, nu13, nu23, G12, G13, G23, alpha) in material_properties.items():
-        stiffness_matrix = get_stiffness_tensor(E1, E2, E3, nu12, nu13, nu23, G12, G13, G23)
+        stiffness_matrix = stiffness_matrices[tag]
         a_h_tag, L_h_tag = ufl.system(ufl.inner(P_tot_multiple_rhs(h, stiffness_matrix), epsilon_sym(h_)) * dx(tag))
         a_h += a_h_tag
         L_h += L_h_tag
@@ -120,8 +126,10 @@ def solve_unit_cell(domain, cell_tags, material_state, mpc, bcs_disp, u_temp_pre
     u_mpc_h = fem.Function(mpc.function_space)
     u_mpc_k = fem.Function(mpc.function_space)
 
-    problem_h = MPCLinearProblem(a_h, L_h, mpc, bcs=[bcs_disp], u=u_mpc_h)
-    problem_k = MPCLinearProblem(a_k, L_k, mpc, bcs=[bcs_disp], u=u_mpc_k)
+    petsc_options={"ksp_type": "gmres", "pc_type": "ilu"}
+
+    problem_h = MPCLinearProblem(a_h, L_h, mpc, bcs=[bcs_disp], u=u_mpc_h, petsc_options=petsc_options)
+    problem_k = MPCLinearProblem(a_k, L_k, mpc, bcs=[bcs_disp], u=u_mpc_k, petsc_options=petsc_options)
     K_solve   = problem_k.solve()
     
     elementary_load = np.array([[1.0, 0.0, 0.0, 0.0, 0.0, 0.0], 
@@ -133,24 +141,24 @@ def solve_unit_cell(domain, cell_tags, material_state, mpc, bcs_disp, u_temp_pre
 
     dim_load = elementary_load.shape[0]
     temporary_tensor = np.zeros((dim_load, dim_load))
+    vol_inv = 1.0 / unit_cell_volume
+    j_allowed = {i: [j for j in range(dim_load) if not (((i > 2) or (j > 2)) and (i != j))] for i in range(dim_load)}
 
-    for i in trange(dim_load, colour="red", desc="Solve Unit Cell", position=1, leave=False, bar_format='{l_bar}{bar:30}{r_bar}', total=dim_load):
+    # for i in trange(dim_load, colour="red", desc="Solve Unit Cell", position=1, leave=False, bar_format='{l_bar}{bar:30}{r_bar}', total=dim_load):
+    for i in range(dim_load):
         applied_eps.value = elementary_load[i]
         H_solve = problem_h.solve()
-        
-        for j in range(dim_load):
-            if ((i > 2) | (j > 2)) & (i != j):
-                continue
+
+        for j in j_allowed[i]:
             applied_eps_.value = elementary_load[j]
-            for tag, (E1, E2, E3, nu12, nu13, nu23, G12, G13, G23, alpha) in material_properties.items():
-                stiffness_matrix = get_stiffness_tensor(E1, E2, E3, nu12, nu13, nu23, G12, G13, G23)
-                temporary_tensor[i, j] += (1 / unit_cell_volume) * fem.assemble_scalar(fem.form(ufl.inner(P_tot_multiple_rhs(H_solve, stiffness_matrix), applied_eps_) * dx(tag)))
+            for tag, stiffness_matrix in stiffness_matrices.items():
+                temporary_tensor[i, j] += vol_inv * fem.assemble_scalar(fem.form(ufl.inner(P_tot_multiple_rhs(H_solve, stiffness_matrix), applied_eps_) * dx(tag)))
 
     stiffness_tensor_homogenized.value = temporary_tensor
 
     temporary_vector = np.zeros((dim_load))
     for tag, (E1, E2, E3, nu12, nu13, nu23, G12, G13, G23, alpha) in material_properties.items():
-        stiffness_matrix = get_stiffness_tensor(E1, E2, E3, nu12, nu13, nu23, G12, G13, G23)
+        stiffness_matrix = stiffness_matrices[tag]
         for j in range(dim_load):
             if j > 2:
                 continue

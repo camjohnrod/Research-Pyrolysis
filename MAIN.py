@@ -9,10 +9,12 @@ import ufl
 import dolfinx_mpc.utils
 from   dolfinx import fem, mesh, io, default_scalar_type
 from   dolfinx.io import XDMFFile
-from   dolfinx_mpc import LinearProblem as MPCLinearProblem
+from   petsc4py import PETSc
+import dolfinx.fem.petsc
 from   dolfinx.fem.petsc import NonlinearProblem, LinearProblem
 from   dolfinx.nls.petsc import NewtonSolver
 from   mpi4py import MPI
+
 
 from unit_cell_mpc import get_mpc
 from unit_cell_solve import solve_unit_cell
@@ -32,7 +34,7 @@ if not os.path.exists("mesh"):
 
 save_every = 4
 
-num_cycles                = 8
+num_cycles                = 3
 temp_ramp_duration        = 3 * (60 * 60)
 temp_long_hold_duration   = 3 * (60 * 60)
 temp_short_hold_duration  = 0.5 * (60 * 60)
@@ -71,7 +73,7 @@ E2_fib         = 13.8e9
 E3_fib         = 13.8e9
 
 nu12_fib       = 0.14  
-nu13_fib       = 0.26  
+nu13_fib       = 0.14  
 nu23_fib       = 0.26  
 
 initial_temp   = 100.0
@@ -231,7 +233,6 @@ class MaterialState:
         G13_m     = E1_m / (2.0 * (1.0 + nu13_m))
         G23_m     = E2_m / (2.0 * (1.0 + nu23_m))
 
-        # Update material properties
         self.r_old.x.array[:] = r_old
         self.r_new.x.array[:] = r_new
         self.k.x.array[:]     = self.rule_of_mixtures_total(k_m,  self.fiber.k)
@@ -256,6 +257,7 @@ class MaterialState:
         return r_new
 
 material_state = MaterialState(domain, fiber, polymer, ceramic, vf_fib)
+
 
 ##==============================================##
 ##=== CALCULATE STARTING MATERIAL PROPERTIES ===##
@@ -294,8 +296,8 @@ fdim_plane = domain.topology.dim - 1
 
 disp_facets         = mesh.locate_entities_boundary(domain, fdim_plane, is_boundary)
 temp_facets         = mesh.locate_entities_boundary(domain, fdim_plane, all_surfaces)
-fixed_dofs_disp   = fem.locate_dofs_topological(S_disp, fdim_plane, disp_facets)
-fixed_dofs_temp   = fem.locate_dofs_topological(S_temp, fdim_plane, temp_facets)
+fixed_dofs_disp     = fem.locate_dofs_topological(S_disp, fdim_plane, disp_facets)
+fixed_dofs_temp     = fem.locate_dofs_topological(S_temp, fdim_plane, temp_facets)
 
 boundary_temp   = fem.Constant(domain, default_scalar_type(initial_temp))
 bcs_temp        = [fem.dirichletbc(boundary_temp, fixed_dofs_temp, S_temp)]
@@ -353,9 +355,11 @@ def P_tot(u, C):
 def P_eigenstrain(eig, C):
     return ufl.dot(C, eig)
 
+petsc_options={"ksp_type": "preonly", "pc_type": "lu"}
+
 a_disp = ufl.inner(epsilon_sym(v_disp_current), P_tot(u_disp_current, stiffness_tensor_homogenized)) * dx
 L_disp = ufl.inner(epsilon_sym(v_disp_current), P_eigenstrain(eigenstrain_homogenized, stiffness_tensor_homogenized)) * dx
-problem_disp = LinearProblem(a_disp, L_disp, bcs=[bcs_disp])
+problem_disp = LinearProblem(a_disp, L_disp, bcs=[bcs_disp], petsc_options=petsc_options)
 
 
 ##=================================================##
@@ -395,6 +399,7 @@ xdmf.write_function(vm_stress_current, 0.0)
 
 
 r_avg_values = [np.mean(material_state.r_new.x.array[:])]
+r_avg_ref = r_avg_values[0]
 temp_avg_values = [np.mean(u_temp_prev.x.array[:])]
 vf_poly_avg_values = [np.mean(material_state.vf_poly)]
 vf_cer_avg_values = [np.mean(material_state.vf_cer)]
@@ -406,8 +411,10 @@ t = dt
 
 old_cycle = 0
 
-for i in trange(num_timesteps, colour="blue", desc="  Time Stepping", position=0, bar_format='{l_bar}{bar:30}{r_bar}', total=num_timesteps):
-
+pbar = trange(num_timesteps, smoothing=0, colour="green", desc="  Time Stepping", position=0, bar_format='{l_bar}{bar:20}{r_bar}')
+for i in pbar:
+    pbar.set_postfix({"Cycle": f"{old_cycle + 1}", "Temp": f"{temp_avg_values[-1]:.1f} C", "r": f"{r_avg_values[-1]:.3f}"}, refresh=False)
+    
     ##=============================================================================##
     ##=== CALCULATE THE APPLIED TEMPERATURE BASED ON WHERE IN EACH CYCLE WE ARE ===##
     ##=============================================================================##
@@ -464,15 +471,19 @@ for i in trange(num_timesteps, colour="blue", desc="  Time Stepping", position=0
         old_cycle = current_cycle
     else:
         material_state.update(material_state.r_new.x.array, u_temp_prev.x.array, dt, vf_poly_0, vf_cer_0, vf_void_0)
+    
+    r_avg = np.mean(material_state.r_new.x.array[:])
 
-    solve_unit_cell(domain_unit_cell, cell_tags_unit_cell, material_state, mpc, bcs_disp_unit_cell, u_temp_prev, beta_history, stiffness_tensor_homogenized, eigenstrain_homogenized)
+    if abs(r_avg - r_avg_ref) > 1e-3:
+        r_avg_ref = r_avg
+        solve_unit_cell(domain_unit_cell, cell_tags_unit_cell, material_state, mpc, bcs_disp_unit_cell, u_temp_prev, beta_history, stiffness_tensor_homogenized, eigenstrain_homogenized)
 
     ##==============================================##
     ##=== CALCULATE MEAN QUANTITIES FOR PLOTTING ===##
     ##==============================================##
 
     time_vector[i + 1] = t / 60 / 60
-    r_avg = np.mean(material_state.r_new.x.array[:])
+    
     temp_avg = np.mean(u_temp_prev.x.array[:])
     vf_poly_avg = np.mean(material_state.vf_poly)
     vf_cer_avg = np.mean(material_state.vf_cer)
