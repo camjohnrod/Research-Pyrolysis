@@ -417,6 +417,8 @@ vf_void_avg_values = [np.mean(material_state.vf_void)]
 E1_avg_values = [1 / np.linalg.inv(stiffness_tensor_homogenized.value)[0,0]]
 E1_point_values = []
 E2_point_values = []
+G12_point_values = []
+G23_point_values = []
 transverse_eigenstrain_values = []
 
 time_vector = np.zeros(num_timesteps + 1)
@@ -484,11 +486,13 @@ for i in pbar:
         material_state.update(material_state.r_new.x.array, u_temp_prev.x.array, dt, vf_poly_0, vf_cer_0, vf_void_0)
         E1_point_values.append(1 / np.linalg.inv(stiffness_tensor_homogenized.value)[0,0])
         E2_point_values.append(1 / np.linalg.inv(stiffness_tensor_homogenized.value)[1,1])
+        G12_point_values.append(1 / np.linalg.inv(stiffness_tensor_homogenized.value)[5,5])
+        G23_point_values.append(1 / np.linalg.inv(stiffness_tensor_homogenized.value)[3,3])
         transverse_eigenstrain_values.append(eigenstrain_homogenized.value[2])
         vf_poly_point_values.append(np.mean(material_state.vf_poly))
         vf_cer_point_values.append(np.mean(material_state.vf_cer))
         vf_void_point_values.append(np.mean(material_state.vf_void))
-        old_cycle = current_cycle
+        old_cycle = int(current_cycle)
     else:
         material_state.update(material_state.r_new.x.array, u_temp_prev.x.array, dt, vf_poly_0, vf_cer_0, vf_void_0)
     
@@ -529,7 +533,7 @@ xdmf.close()
 ##===========================================##
 
 
-marker_size = 8
+marker_size = 6
 ramp_up_end_index = int(temp_ramp_duration / dt)
 
 plt.figure(1)
@@ -574,17 +578,20 @@ plt.savefig('results/r_vs_temp.png')
 
 plt.figure(5)
 cycle_num = np.arange(1, num_cycles + 1)
-plt.plot(cycle_num, E1_point_values, marker='s', markersize=marker_size, color='gray')
-plt.plot(cycle_num, E2_point_values, marker='o', markersize=marker_size, color='red')
+plt.plot(cycle_num, E1_point_values, marker='s', markersize=marker_size, color='gray', label='E1')
+plt.plot(cycle_num, E2_point_values, marker='o', markersize=marker_size, color='red', label='E2 = E3')
+plt.plot(cycle_num, G12_point_values, marker='^', markersize=marker_size, color='blue', label='G12 = G13')
+plt.plot(cycle_num, G23_point_values, marker='v', markersize=marker_size, color='green', label='G23')
 plt.xlabel('Cycle Number', fontsize=14)
-plt.ylabel('Axial Elastic Modulus (GPa)', fontsize=14)
-plt.title('Axial Elastic Modulus vs Cycle Number', fontsize=16)
+plt.ylabel('Modulus (GPa)', fontsize=14)
+plt.title('Modulus vs Cycle Number', fontsize=16)
+plt.legend(fontsize=12)
 plt.xticks(cycle_num)
 plt.xlim([1, num_cycles])
 plt.yticks(np.arange(20e9, 230e9 + 1, 20e9))
 plt.gca().yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x/1e9:.0f}'))
 plt.grid(True)
-plt.savefig('results/E1_and_E2_vs_cycle.png')
+plt.savefig('results/elastic_properties_vs_cycle.png')
 
 plt.figure(6)
 plt.plot(cycle_num, transverse_eigenstrain_values, marker='s', markersize=marker_size, color='gray')
@@ -599,8 +606,8 @@ plt.savefig('results/transverse_eigenstrain_vs_cycle.png')
 plt.figure(7)
 cycle_num = np.arange(0, num_cycles + 1)
 plt.plot(cycle_num, vf_poly_point_values, marker='s', markersize=marker_size, color='gray', label='Polymer Volume Fraction')
-plt.plot(cycle_num, vf_cer_point_values, marker='^', markersize=marker_size, color='blue', label='Ceramic Volume Fraction')
 plt.plot(cycle_num, vf_void_point_values, marker='o', markersize=marker_size, color='red', label='Void Volume Fraction')
+plt.plot(cycle_num, vf_cer_point_values, marker='^', markersize=marker_size, color='blue', label='Ceramic Volume Fraction')
 plt.xlabel('Cycle Number', fontsize=14)
 plt.ylabel('Volume Fraction', fontsize=14)
 plt.title('Volume Fractions vs Cycle Number', fontsize=16)
