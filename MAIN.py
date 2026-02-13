@@ -35,10 +35,10 @@ if not os.path.exists("mesh"):
 
 save_every = 4
 
-num_cycles                = 3
+num_cycles                = 8
 temp_ramp_duration        = 3 * (60 * 60)
 temp_long_hold_duration   = 3 * (60 * 60)
-temp_short_hold_duration  = 0.5 * (60 * 60)
+temp_short_hold_duration  = 1 * (60 * 60)
 
 total_cycle_length  = (2 * temp_ramp_duration + temp_long_hold_duration + temp_short_hold_duration)
 tf                  = num_cycles * total_cycle_length
@@ -70,14 +70,14 @@ nu_poly        = 0.3
 nu_cer         = 0.14  
 
 E1_fib         = 264.5e9   
-E2_fib         = 13.8e9
-E3_fib         = 13.8e9
+E2_fib         = E1_fib
+E3_fib         = E1_fib
 
 nu12_fib       = 0.14  
 nu13_fib       = 0.14  
 nu23_fib       = 0.26  
 
-initial_temp   = 100.0
+initial_temp   = 200.0
 final_temp     = 1200.0
 
 vf_cer_0           = 0.0                        # initial ceramic volume fraction (=0.0 for the first pyrolysis cycle)
@@ -196,9 +196,9 @@ class MaterialState:
         self.G13   = fem.Function(self.S, name="G13")
         self.G23   = fem.Function(self.S, name="G23")
 
-        self.vf_cer  = 0
-        self.vf_void = 0
-        self.vf_poly = 0
+        self.vf_cer  = vf_cer_0
+        self.vf_void = vf_void_0
+        self.vf_poly = vf_poly_0
 
     def rule_of_mixtures_matrix(self, prop_poly, vf_poly, prop_cer, vf_cer):
         return prop_poly * vf_poly + prop_cer * vf_cer
@@ -210,9 +210,10 @@ class MaterialState:
     def update(self, r_old, temp, dt, vf_poly_0, vf_cer_0, vf_void_0):
 
         r_step = (A_factor * np.exp(-E_a / (R_gas * temp)) * (1.0 - r_old) ** n) * dt + r_old
-        if (r_step > 1.0).any():
-            raise ValueError("The ceramization degree cannot exceed 1.0. Consider reducing the timestep.")
+        
         if (r_step >= r_old).all():
+            if (r_step > 1.0 + 1e-6).any():
+                raise ValueError("The ceramization degree cannot exceed 1.0. Consider reducing the timestep.")
             r_new = r_step
 
         self.vf_cer  = (1 - a) * r_new * vf_poly_0 + vf_cer_0
@@ -258,6 +259,9 @@ class MaterialState:
         return r_new
 
 material_state = MaterialState(domain, fiber, polymer, ceramic, vf_fib)
+vf_poly_point_values = [np.mean(material_state.vf_poly)]
+vf_cer_point_values = [np.mean(material_state.vf_cer)]
+vf_void_point_values = [np.mean(material_state.vf_void)]
 
 
 ##==============================================##
@@ -294,7 +298,6 @@ stiffness_spatial, eig_spatial, S_stiffness, S_eig = build_spatial_fields(
 
 
 def is_boundary(x):
-    # return ((x[0] <= -0.013) & (x[1] <= 0.033))
     return x[0] <= 1e-12
 
 def all_surfaces(x):
@@ -365,9 +368,6 @@ def P_eigenstrain(eig, C):
 
 petsc_options={"ksp_type": "preonly", "pc_type": "lu"}
 
-# a_disp = ufl.inner(epsilon_sym(v_disp_current), P_tot(u_disp_current, stiffness_tensor_homogenized)) * dx
-# L_disp = ufl.inner(epsilon_sym(v_disp_current), P_eigenstrain(eigenstrain_homogenized, stiffness_tensor_homogenized)) * dx
-# problem_disp = LinearProblem(a_disp, L_disp, bcs=[bcs_disp], petsc_options=petsc_options)
 a_disp = ufl.inner(epsilon_sym(v_disp_current), P_tot(u_disp_current, stiffness_spatial)) * dx
 L_disp = ufl.inner(epsilon_sym(v_disp_current), P_eigenstrain(eig_spatial, stiffness_spatial)) * dx
 problem_disp = LinearProblem(a_disp, L_disp, bcs=[bcs_disp], petsc_options=petsc_options)
@@ -381,13 +381,6 @@ phi    = ufl.TrialFunction(S_constant)
 psi    = ufl.TestFunction(S_constant)
 a_proj = ufl.inner(phi, psi) * dx
 
-# tot_stress_expr = P_tot(u_disp_current_store, stiffness_tensor_homogenized) - P_eigenstrain(eigenstrain_homogenized, stiffness_tensor_homogenized)       
-# von_mises_expr = ufl.sqrt(0.5 * ((tot_stress_expr[0] - tot_stress_expr[1])**2 +
-#                                  (tot_stress_expr[1] - tot_stress_expr[2])**2 +
-#                                  (tot_stress_expr[2] - tot_stress_expr[0])**2 +
-#                              6 * (tot_stress_expr[3]**2 + tot_stress_expr[4]**2 + tot_stress_expr[5]**2)))
-# L_proj_von_mises = von_mises_expr * psi * dx
-# problem_stress_projection = LinearProblem(a_proj, L_proj_von_mises, bcs=[])
 tot_stress_expr = P_tot(u_disp_current_store, stiffness_spatial) - P_eigenstrain(eig_spatial, stiffness_spatial)
 von_mises_expr  = ufl.sqrt(0.5 * ((tot_stress_expr[0] - tot_stress_expr[1])**2 +
                                    (tot_stress_expr[1] - tot_stress_expr[2])**2 +
@@ -421,7 +414,10 @@ temp_avg_values = [np.mean(u_temp_prev.x.array[:])]
 vf_poly_avg_values = [np.mean(material_state.vf_poly)]
 vf_cer_avg_values = [np.mean(material_state.vf_cer)]
 vf_void_avg_values = [np.mean(material_state.vf_void)]
-E_avg_values = [1 / np.linalg.inv(stiffness_tensor_homogenized.value)[0,0]]
+E1_avg_values = [1 / np.linalg.inv(stiffness_tensor_homogenized.value)[0,0]]
+E1_point_values = []
+E2_point_values = []
+
 time_vector = np.zeros(num_timesteps + 1)
 
 t = dt
@@ -485,6 +481,11 @@ for i in pbar:
         vf_cer_0  = material_state.vf_cer
         material_state = MaterialState(domain, fiber, polymer, ceramic, vf_fib)
         material_state.update(material_state.r_new.x.array, u_temp_prev.x.array, dt, vf_poly_0, vf_cer_0, vf_void_0)
+        E1_point_values.append(1 / np.linalg.inv(stiffness_tensor_homogenized.value)[0,0])
+        E2_point_values.append(1 / np.linalg.inv(stiffness_tensor_homogenized.value)[1,1])
+        vf_poly_point_values.append(np.mean(material_state.vf_poly))
+        vf_cer_point_values.append(np.mean(material_state.vf_cer))
+        vf_void_point_values.append(np.mean(material_state.vf_void))
         old_cycle = current_cycle
     else:
         material_state.update(material_state.r_new.x.array, u_temp_prev.x.array, dt, vf_poly_0, vf_cer_0, vf_void_0)
@@ -514,7 +515,7 @@ for i in pbar:
     vf_poly_avg_values.append(vf_poly_avg)
     vf_cer_avg_values.append(vf_cer_avg)
     vf_void_avg_values.append(vf_void_avg)
-    E_avg_values.append(1 / np.linalg.inv(stiffness_tensor_homogenized.value)[0,0])
+    E1_avg_values.append(1 / np.linalg.inv(stiffness_tensor_homogenized.value)[0,0])
 
     t += dt
 
@@ -525,6 +526,8 @@ xdmf.close()
 ##=== PLOT QUANTITIES AT THE CENTER POINT ===##
 ##===========================================##
 
+marker_size = 8
+ramp_up_end_index = int(temp_ramp_duration / dt)
 
 plt.figure(1)
 plt.plot(time_vector[:-2], r_avg_values[:-2], marker='o', color='g')
@@ -557,10 +560,10 @@ plt.savefig('results/volume_fractions_vs_time.png')
 plt.figure(4)
 ax1 = plt.gca()
 ax2 = ax1.twinx()
-ax1.plot(time_vector, E_avg_values, color='blue', linewidth=3, label='Elastic Modulus')
-ax2.plot(time_vector, temp_avg_values, color='red', linewidth=3, label='Temperature')
+ax1.plot(time_vector[0:ramp_up_end_index], E1_avg_values[0:ramp_up_end_index], color='blue', linewidth=3, label='Elastic Modulus')
+ax2.plot(time_vector[0:ramp_up_end_index], temp_avg_values[0:ramp_up_end_index], color='red', linewidth=3, label='Temperature')
 ax1.set_xlabel('Time (hr)', fontsize=14)
-ax1.set_ylabel('Elastic Modulus (Pa)', fontsize=14)
+ax1.set_ylabel('Axial Elastic Modulus, E1 (Pa)', fontsize=14)
 ax2.set_ylabel('Temperature (C)', fontsize=14)
 
 plt.title('Elastic Modulus and Temperature vs Time', fontsize=16)
@@ -568,10 +571,37 @@ plt.grid(True)
 plt.savefig('results/E_and_temp_vs_time.png')
 
 plt.figure(5)
-ramp_up_end_index = int(temp_ramp_duration / dt)
 plt.plot(temp_avg_values[0:ramp_up_end_index], r_avg_values[0:ramp_up_end_index], marker='o', color='orange')
 plt.xlabel('Temperature (C)', fontsize=14)
 plt.ylabel('r', fontsize=14)
 plt.title('Ceramization Degree vs Temperature', fontsize=16)
 plt.grid(True)
 plt.savefig('results/r_vs_temp.png')
+
+plt.figure(6)
+cycle_num = np.arange(1, num_cycles + 1)
+plt.plot(cycle_num, E1_point_values, marker='s', markersize=marker_size, color='gray')
+plt.plot(cycle_num, E2_point_values, marker='o', markersize=marker_size, color='red')
+plt.xlabel('Cycle Number', fontsize=14)
+plt.ylabel('Axial Elastic Modulus (GPa)', fontsize=14)
+plt.title('Axial Elastic Modulus vs Cycle Number', fontsize=16)
+plt.xlim([1, num_cycles])
+plt.ylim([20e9, 230e9])
+plt.gca().yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x/1e9:.0f}'))
+plt.grid(True)
+plt.savefig('results/E1_and_E2_vs_cycle.png')
+
+plt.figure(7)
+cycle_num = np.arange(0, num_cycles + 1)
+plt.plot(cycle_num, vf_poly_point_values, marker='s', markersize=marker_size, color='gray', label='Polymer Volume Fraction')
+plt.plot(cycle_num, vf_cer_point_values, marker='^', markersize=marker_size, color='blue', label='Ceramic Volume Fraction')
+plt.plot(cycle_num, vf_void_point_values, marker='o', markersize=marker_size, color='red', label='Void Volume Fraction')
+plt.xlabel('Cycle Number', fontsize=14)
+plt.ylabel('Volume Fraction', fontsize=14)
+plt.title('Volume Fractions at the Center Point vs Cycle Number', fontsize=16)
+plt.xticks(cycle_num)
+plt.xlim([0, num_cycles])
+plt.ylim([0,1])
+plt.legend(fontsize=12)
+plt.grid(True)
+plt.savefig('results/volume_fractions_vs_cycle.png')
