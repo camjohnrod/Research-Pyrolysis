@@ -5,9 +5,9 @@ from   dolfinx import fem, mesh, default_scalar_type
 
 def get_mpc(domain):
 
-    length   = 24e-6
-    width    = 24e-6
-    height   = 24e-6  
+    length   = 16e-6
+    width    = 16e-6
+    height   = 16e-6  
     
     S_disp = fem.functionspace(domain, ("Lagrange", 1, (domain.geometry.dim, )))
 

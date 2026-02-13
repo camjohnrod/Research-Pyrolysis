@@ -46,7 +46,7 @@ tf                  = num_cycles * total_cycle_length
 num_timesteps  = int(tf / 60 / 8)
 dt             = tf / num_timesteps
 
-vf_fib         = 0.54 # hard coded
+vf_fib         = 0.61 # hard coded
 
 k_poly         = 12.6
 k_cer          = 120.0
@@ -73,9 +73,9 @@ E1_fib         = 264.5e9
 E2_fib         = E1_fib
 E3_fib         = E1_fib
 
-nu12_fib       = 0.14  
-nu13_fib       = 0.14  
-nu23_fib       = 0.26  
+nu12_fib       = 0.26  
+nu13_fib       = nu12_fib
+nu23_fib       = nu12_fib  
 
 initial_temp   = 200.0
 final_temp     = 1200.0
@@ -83,7 +83,7 @@ final_temp     = 1200.0
 vf_cer_0           = 0.0                        # initial ceramic volume fraction (=0.0 for the first pyrolysis cycle)
 vf_poly_0          = 0.8                        # initial polymer volume fraction (=1.0 for the first pyrolysis cycle)
 vf_void_0          = 1 - vf_poly_0 - vf_cer_0   # initial void volume fraction
-a                  = 0.7                        # "void formation ratio of the precursor", value is not mentioned in the Zhang paper
+a                  = 0.8                        # "void formation ratio of the precursor", value is not mentioned in the Zhang paper
 infiltration_ratio = 0.8                        # ratio of how much of the void volume fraction gets filled by polymer 
 
 # all taken from the Zhang paper 
@@ -417,6 +417,7 @@ vf_void_avg_values = [np.mean(material_state.vf_void)]
 E1_avg_values = [1 / np.linalg.inv(stiffness_tensor_homogenized.value)[0,0]]
 E1_point_values = []
 E2_point_values = []
+transverse_eigenstrain_values = []
 
 time_vector = np.zeros(num_timesteps + 1)
 
@@ -483,6 +484,7 @@ for i in pbar:
         material_state.update(material_state.r_new.x.array, u_temp_prev.x.array, dt, vf_poly_0, vf_cer_0, vf_void_0)
         E1_point_values.append(1 / np.linalg.inv(stiffness_tensor_homogenized.value)[0,0])
         E2_point_values.append(1 / np.linalg.inv(stiffness_tensor_homogenized.value)[1,1])
+        transverse_eigenstrain_values.append(eigenstrain_homogenized.value[2])
         vf_poly_point_values.append(np.mean(material_state.vf_poly))
         vf_cer_point_values.append(np.mean(material_state.vf_cer))
         vf_void_point_values.append(np.mean(material_state.vf_void))
@@ -526,18 +528,11 @@ xdmf.close()
 ##=== PLOT QUANTITIES AT THE CENTER POINT ===##
 ##===========================================##
 
+
 marker_size = 8
 ramp_up_end_index = int(temp_ramp_duration / dt)
 
 plt.figure(1)
-plt.plot(time_vector[:-2], r_avg_values[:-2], marker='o', color='g')
-plt.xlabel('Time (hr)', fontsize=14)
-plt.ylabel('r', fontsize=14)
-plt.title('Ceramization Degree vs Time', fontsize=16)
-plt.grid(True)
-plt.savefig('results/r_vs_time.png')
-
-plt.figure(2)
 plt.plot(time_vector, temp_avg_values, marker='o', color='r')
 plt.xlabel('Time (hr)', fontsize=14)
 plt.ylabel('Temperature (C)', fontsize=14)
@@ -545,7 +540,7 @@ plt.title('Temperature vs Time', fontsize=16)
 plt.grid(True)
 plt.savefig('results/temp_vs_time.png')
 
-plt.figure(3)
+plt.figure(2)
 plt.plot(time_vector, vf_poly_avg_values, color='green', linewidth = 3, label='Polymer Volume Fraction')
 plt.plot(time_vector, vf_cer_avg_values, color='orange', linewidth = 3, label='Ceramic Volume Fraction')
 plt.plot(time_vector, vf_void_avg_values, color='gray', linewidth = 3, label='Void Volume Fraction')
@@ -557,20 +552,19 @@ plt.grid(True)
 plt.ylim([0,1])
 plt.savefig('results/volume_fractions_vs_time.png')
 
-plt.figure(4)
+plt.figure(3)
 ax1 = plt.gca()
 ax2 = ax1.twinx()
-ax1.plot(time_vector[0:ramp_up_end_index], E1_avg_values[0:ramp_up_end_index], color='blue', linewidth=3, label='Elastic Modulus')
-ax2.plot(time_vector[0:ramp_up_end_index], temp_avg_values[0:ramp_up_end_index], color='red', linewidth=3, label='Temperature')
+ax2.plot(time_vector, temp_avg_values, '--r', linewidth=3, label='Temperature')
+ax1.plot(time_vector, E1_avg_values, '-b', linewidth=3, label='Elastic Modulus')
 ax1.set_xlabel('Time (hr)', fontsize=14)
 ax1.set_ylabel('Axial Elastic Modulus, E1 (Pa)', fontsize=14)
 ax2.set_ylabel('Temperature (C)', fontsize=14)
-
 plt.title('Elastic Modulus and Temperature vs Time', fontsize=16)
 plt.grid(True)
 plt.savefig('results/E_and_temp_vs_time.png')
 
-plt.figure(5)
+plt.figure(4)
 plt.plot(temp_avg_values[0:ramp_up_end_index], r_avg_values[0:ramp_up_end_index], marker='o', color='orange')
 plt.xlabel('Temperature (C)', fontsize=14)
 plt.ylabel('r', fontsize=14)
@@ -578,18 +572,29 @@ plt.title('Ceramization Degree vs Temperature', fontsize=16)
 plt.grid(True)
 plt.savefig('results/r_vs_temp.png')
 
-plt.figure(6)
+plt.figure(5)
 cycle_num = np.arange(1, num_cycles + 1)
 plt.plot(cycle_num, E1_point_values, marker='s', markersize=marker_size, color='gray')
 plt.plot(cycle_num, E2_point_values, marker='o', markersize=marker_size, color='red')
 plt.xlabel('Cycle Number', fontsize=14)
 plt.ylabel('Axial Elastic Modulus (GPa)', fontsize=14)
 plt.title('Axial Elastic Modulus vs Cycle Number', fontsize=16)
+plt.xticks(cycle_num)
 plt.xlim([1, num_cycles])
-plt.ylim([20e9, 230e9])
+plt.yticks(np.arange(20e9, 230e9 + 1, 20e9))
 plt.gca().yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x/1e9:.0f}'))
 plt.grid(True)
 plt.savefig('results/E1_and_E2_vs_cycle.png')
+
+plt.figure(6)
+plt.plot(cycle_num, transverse_eigenstrain_values, marker='s', markersize=marker_size, color='gray')
+plt.xlabel('Cycle Number', fontsize=14)
+plt.ylabel('Transverse Eigenstrain', fontsize=14)
+plt.title('Transverse Eigenstrain vs Cycle Number', fontsize=16)
+plt.xticks(cycle_num)
+plt.xlim([1, num_cycles])
+plt.grid(True)
+plt.savefig('results/transverse_eigenstrain_vs_cycle.png')
 
 plt.figure(7)
 cycle_num = np.arange(0, num_cycles + 1)
@@ -598,7 +603,7 @@ plt.plot(cycle_num, vf_cer_point_values, marker='^', markersize=marker_size, col
 plt.plot(cycle_num, vf_void_point_values, marker='o', markersize=marker_size, color='red', label='Void Volume Fraction')
 plt.xlabel('Cycle Number', fontsize=14)
 plt.ylabel('Volume Fraction', fontsize=14)
-plt.title('Volume Fractions at the Center Point vs Cycle Number', fontsize=16)
+plt.title('Volume Fractions vs Cycle Number', fontsize=16)
 plt.xticks(cycle_num)
 plt.xlim([0, num_cycles])
 plt.ylim([0,1])

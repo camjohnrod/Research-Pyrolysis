@@ -10,19 +10,19 @@ import numpy as np
 
 # --- Dimensions ---
 # Lx: extrusion length (along x). Ly, Lz: cross-section extents (y and z).
-Lx = 24e-6      # extrusion length (thickness in x direction)
-Ly = 24e-6      # cross-section extent in y
-Lz = 24e-6      # cross-section extent in z
+Lx = 16e-6      # extrusion length (thickness in x direction)
+Ly = 16e-6      # cross-section extent in y
+Lz = 16e-6      # cross-section extent in z
 
 # --- Circular inclusion (in cross-section plane: y-z) ---
 cy = Ly / 2     # circle center y
 cz = Lz / 2     # circle center z
-r_real  = 10e-6  # radius
+r_real  = 7e-6  # radius
 
 # --- Mesh controls ---
-n_outer = 6      # divisions on outer edges
-n_inner = 6      # divisions on fiber–matrix connectors
-nz      = 4       # number of layers in extrusion
+n_outer = 7      # divisions on outer edges
+n_inner = 9      # divisions on fiber–matrix connectors
+nz      = 5       # number of layers in extrusion
 
 fiber_volume = np.pi * r_real ** 2 * Lx
 total_volume = Ly * Lz * Lx

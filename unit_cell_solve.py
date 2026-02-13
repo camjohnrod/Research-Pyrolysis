@@ -13,9 +13,9 @@ from   mpi4py import MPI
 
 def solve_unit_cell(domain, cell_tags, material_state, mpc, bcs_disp, u_temp_prev, beta_history, stiffness_tensor_homogenized, eigenstrain_homogenized):
 
-    length   = 24e-6
-    width    = 24e-6
-    height   = 24e-6    
+    length   = 16e-6
+    width    = 16e-6
+    height   = 16e-6    
 
     unit_cell_volume = length * width * height
 
@@ -126,7 +126,7 @@ def solve_unit_cell(domain, cell_tags, material_state, mpc, bcs_disp, u_temp_pre
     u_mpc_h = fem.Function(mpc.function_space)
     u_mpc_k = fem.Function(mpc.function_space)
 
-    petsc_options={"ksp_type": "gmres", "pc_type": "ilu"}
+    petsc_options={}
 
     problem_h = MPCLinearProblem(a_h, L_h, mpc, bcs=[bcs_disp], u=u_mpc_h, petsc_options=petsc_options)
     problem_k = MPCLinearProblem(a_k, L_k, mpc, bcs=[bcs_disp], u=u_mpc_k, petsc_options=petsc_options)
