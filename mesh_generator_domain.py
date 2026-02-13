@@ -18,7 +18,7 @@ W = 110.0e-3      # thickness in z
 # Transfinite mesh divisions
 n_radial = 7      # divisions along radial direction (inner to outer)
 n_arc = 15        # divisions along arc
-n_length = 21     # divisions along arm length
+n_length = 9     # divisions along arm length
 n_thickness = 7   # divisions through thickness (z-direction)
 
 half = theta / 2
@@ -111,10 +111,29 @@ gmsh.model.occ.synchronize()
 # ---------------------------
 # PART 6: Translate everything so z=0 is at the midplane
 # ---------------------------
-all_entities = gmsh.model.getEntities()
-gmsh.model.occ.translate(all_entities, 0, 0, -W/2)
+# all_entities = gmsh.model.getEntities()
+# gmsh.model.occ.translate(all_entities, 0, 0, -W/2)
 
+# gmsh.model.occ.synchronize()
+
+rot_angle = math.pi / 2 - a2
+gmsh.model.occ.rotate(
+    gmsh.model.getEntities(),
+    0, 0, 0,    # point on rotation axis
+    0, 0, 1,    # rotation axis direction (z)
+    rot_angle
+)
 gmsh.model.occ.synchronize()
+
+# x6 = Ro * math.cos(a1 + rot_angle)   # = Ro*cos(pi - theta) = -Ro*cos(theta)
+# y6 = Ro * math.sin(a1 + rot_angle)   # = Ro*sin(pi - theta) =  Ro*sin(theta)
+# z6 = 0.0  
+
+# gmsh.model.occ.translate(
+#     gmsh.model.getEntities(),
+#     -x6, -y6, -z6
+# )
+# gmsh.model.occ.synchronize()
 
 # ============================================================================
 # CRITICAL FIX: Apply transfinite meshing AFTER all boolean operations

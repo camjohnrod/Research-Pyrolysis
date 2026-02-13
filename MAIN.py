@@ -18,6 +18,7 @@ from   mpi4py import MPI
 
 from unit_cell_mpc import get_mpc
 from unit_cell_solve import solve_unit_cell
+from define_rotation import build_spatial_fields, update_spatial_fields
 
 
 if not os.path.exists("results"):
@@ -274,11 +275,17 @@ delta_temp = u_temp_prev - initial_temp
 material_state.update(material_state.r_new.x.array, u_temp_prev.x.array, dt, vf_poly_0, vf_cer_0, vf_void_0)
 mpc, bcs_disp_unit_cell = get_mpc(domain_unit_cell)
 
-beta_history = fem.Constant(domain_unit_cell, 0.0)
+beta_history                 = fem.Constant(domain_unit_cell, 0.0)
 stiffness_tensor_homogenized = fem.Constant(domain_unit_cell, np.zeros((6, 6), dtype=default_scalar_type))
-eigenstrain_homogenized = fem.Constant(domain_unit_cell, np.zeros(6, dtype=default_scalar_type))
+eigenstrain_homogenized      = fem.Constant(domain_unit_cell, np.zeros(6, dtype=default_scalar_type))
 
 solve_unit_cell(domain_unit_cell, cell_tags_unit_cell, material_state, mpc, bcs_disp_unit_cell, u_temp_prev, beta_history, stiffness_tensor_homogenized, eigenstrain_homogenized)
+
+stiffness_spatial, eig_spatial, S_stiffness, S_eig = build_spatial_fields(
+    domain,
+    stiffness_tensor_homogenized.value,
+    eigenstrain_homogenized.value
+)
 
 
 ##======================================##
@@ -287,7 +294,8 @@ solve_unit_cell(domain_unit_cell, cell_tags_unit_cell, material_state, mpc, bcs_
 
 
 def is_boundary(x):
-    return ((x[0] <= -0.013) & (x[1] <= 0.033))
+    # return ((x[0] <= -0.013) & (x[1] <= 0.033))
+    return x[0] <= 1e-12
 
 def all_surfaces(x):
     return np.full(x.shape[1], True, dtype=bool)
@@ -357,10 +365,12 @@ def P_eigenstrain(eig, C):
 
 petsc_options={"ksp_type": "preonly", "pc_type": "lu"}
 
-a_disp = ufl.inner(epsilon_sym(v_disp_current), P_tot(u_disp_current, stiffness_tensor_homogenized)) * dx
-L_disp = ufl.inner(epsilon_sym(v_disp_current), P_eigenstrain(eigenstrain_homogenized, stiffness_tensor_homogenized)) * dx
+# a_disp = ufl.inner(epsilon_sym(v_disp_current), P_tot(u_disp_current, stiffness_tensor_homogenized)) * dx
+# L_disp = ufl.inner(epsilon_sym(v_disp_current), P_eigenstrain(eigenstrain_homogenized, stiffness_tensor_homogenized)) * dx
+# problem_disp = LinearProblem(a_disp, L_disp, bcs=[bcs_disp], petsc_options=petsc_options)
+a_disp = ufl.inner(epsilon_sym(v_disp_current), P_tot(u_disp_current, stiffness_spatial)) * dx
+L_disp = ufl.inner(epsilon_sym(v_disp_current), P_eigenstrain(eig_spatial, stiffness_spatial)) * dx
 problem_disp = LinearProblem(a_disp, L_disp, bcs=[bcs_disp], petsc_options=petsc_options)
-
 
 ##=================================================##
 ##=== DEFINE THE PROJECTION FOR OTHER VARIABLES ===##
@@ -371,11 +381,18 @@ phi    = ufl.TrialFunction(S_constant)
 psi    = ufl.TestFunction(S_constant)
 a_proj = ufl.inner(phi, psi) * dx
 
-tot_stress_expr = P_tot(u_disp_current_store, stiffness_tensor_homogenized) - P_eigenstrain(eigenstrain_homogenized, stiffness_tensor_homogenized)       
-von_mises_expr = ufl.sqrt(0.5 * ((tot_stress_expr[0] - tot_stress_expr[1])**2 +
-                                 (tot_stress_expr[1] - tot_stress_expr[2])**2 +
-                                 (tot_stress_expr[2] - tot_stress_expr[0])**2 +
-                             6 * (tot_stress_expr[3]**2 + tot_stress_expr[4]**2 + tot_stress_expr[5]**2)))
+# tot_stress_expr = P_tot(u_disp_current_store, stiffness_tensor_homogenized) - P_eigenstrain(eigenstrain_homogenized, stiffness_tensor_homogenized)       
+# von_mises_expr = ufl.sqrt(0.5 * ((tot_stress_expr[0] - tot_stress_expr[1])**2 +
+#                                  (tot_stress_expr[1] - tot_stress_expr[2])**2 +
+#                                  (tot_stress_expr[2] - tot_stress_expr[0])**2 +
+#                              6 * (tot_stress_expr[3]**2 + tot_stress_expr[4]**2 + tot_stress_expr[5]**2)))
+# L_proj_von_mises = von_mises_expr * psi * dx
+# problem_stress_projection = LinearProblem(a_proj, L_proj_von_mises, bcs=[])
+tot_stress_expr = P_tot(u_disp_current_store, stiffness_spatial) - P_eigenstrain(eig_spatial, stiffness_spatial)
+von_mises_expr  = ufl.sqrt(0.5 * ((tot_stress_expr[0] - tot_stress_expr[1])**2 +
+                                   (tot_stress_expr[1] - tot_stress_expr[2])**2 +
+                                   (tot_stress_expr[2] - tot_stress_expr[0])**2 +
+                               6 * (tot_stress_expr[3]**2 + tot_stress_expr[4]**2 + tot_stress_expr[5]**2)))
 L_proj_von_mises = von_mises_expr * psi * dx
 problem_stress_projection = LinearProblem(a_proj, L_proj_von_mises, bcs=[])
 
@@ -477,7 +494,10 @@ for i in pbar:
     if abs(r_avg - r_avg_ref) > 1e-3:
         r_avg_ref = r_avg
         solve_unit_cell(domain_unit_cell, cell_tags_unit_cell, material_state, mpc, bcs_disp_unit_cell, u_temp_prev, beta_history, stiffness_tensor_homogenized, eigenstrain_homogenized)
-
+        update_spatial_fields(stiffness_spatial, eig_spatial, domain,
+                              stiffness_tensor_homogenized.value,
+                              eigenstrain_homogenized.value)
+        
     ##==============================================##
     ##=== CALCULATE MEAN QUANTITIES FOR PLOTTING ===##
     ##==============================================##
