@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import os
+import yaml
 from   tqdm import tqdm
 from   tqdm.auto import trange
 from   dataclasses import dataclass
@@ -33,65 +34,37 @@ if not os.path.exists("mesh"):
 ##======================================##
 
 
-save_every = 4
+with open("inputs.yaml", "r") as f:
+    cfg = yaml.safe_load(f)
 
-num_cycles                = 8
-temp_ramp_duration        = 3 * (60 * 60)
-temp_long_hold_duration   = 3 * (60 * 60)
-temp_short_hold_duration  = 1 * (60 * 60)
+save_every = cfg["save_every"]
+num_cycles = cfg["num_cycles"]
 
-total_cycle_length  = (2 * temp_ramp_duration + temp_long_hold_duration + temp_short_hold_duration)
-tf                  = num_cycles * total_cycle_length
+temp_ramp_duration       = cfg["temp_ramp_duration"]
+temp_long_hold_duration  = cfg["temp_long_hold_duration"]
+temp_short_hold_duration = cfg["temp_short_hold_duration"]
 
-num_timesteps  = int(tf / 60 / 8)
-dt             = tf / num_timesteps
+initial_temp = cfg["initial_temp"]
+final_temp   = cfg["final_temp"]
 
-vf_fib         = 0.61 # hard coded
+total_cycle_length = (2 * temp_ramp_duration + temp_long_hold_duration + temp_short_hold_duration)
+tf                 = num_cycles * total_cycle_length
 
-k_poly         = 12.6
-k_cer          = 120.0
-k_fib          = 54
+num_timesteps = int(tf / 60 / 8)
+dt            = tf / num_timesteps
 
-cp_poly        = 1170.0
-cp_cer         = 750.0
-cp_fib         = 879
+kin      = cfg["pyrolysis"]
+n        = kin["n"]
+A_factor = kin["A_factor"]
+E_a      = kin["E_a"]
+R_gas    = kin["R_gas"]
 
-alpha_mat      = 3.95e-6
-alpha_fib      = -0.64e-6
-
-rho_poly       = 1150.0    # updated
-rho_cer        = 2450.0    # updated
-rho_fib        = 1780     
-
-E_poly         = 4.94e9    # updated
-E_cer          = 206.18e9  # updated
-
-nu_poly        = 0.3   
-nu_cer         = 0.14  
-
-E1_fib         = 264.5e9   
-E2_fib         = E1_fib
-E3_fib         = E1_fib
-
-nu12_fib       = 0.26  
-nu13_fib       = nu12_fib
-nu23_fib       = nu12_fib  
-
-initial_temp   = 200.0
-final_temp     = 1200.0
-
-vf_cer_0           = 0.0                        # initial ceramic volume fraction (=0.0 for the first pyrolysis cycle)
-vf_poly_0          = 0.8                        # initial polymer volume fraction (=1.0 for the first pyrolysis cycle)
-vf_void_0          = 1 - vf_poly_0 - vf_cer_0   # initial void volume fraction
-a                  = 0.8                        # "void formation ratio of the precursor", value is not mentioned in the Zhang paper
-infiltration_ratio = 0.8                        # ratio of how much of the void volume fraction gets filled by polymer 
-
-# all taken from the Zhang paper 
-
-n              = 2
-A_factor       = 1.5795
-E_a            = 18.216e3
-R_gas          = 8.3145
+vf           = cfg["volume_fractions"]
+vf_cer_0     = vf["vf_cer_0"]
+vf_poly_0    = vf["vf_poly_0"]
+vf_void_0    = vf["vf_void_0"]
+a            = vf["a"]
+infiltration_ratio = vf["infiltration_ratio"]
 
 
 ##======================================##
@@ -146,7 +119,7 @@ class MaterialConstants:
     nu12: float
     nu13: float
     nu23: float
-    
+
     @property
     def G12(self) -> float:
         return self.E1 / (2.0 * (1.0 + self.nu12))
@@ -159,9 +132,12 @@ class MaterialConstants:
     def G23(self) -> float:
         return self.E2 / (2.0 * (1.0 + self.nu23))
 
-fiber   = MaterialConstants(k_fib, cp_fib, alpha_fib, rho_fib, E1_fib, E2_fib, E3_fib, nu12_fib, nu13_fib, nu23_fib)
-polymer = MaterialConstants(k_poly, cp_poly, alpha_mat, rho_poly, E_poly, E_poly, E_poly, nu_poly, nu_poly, nu_poly)
-ceramic = MaterialConstants(k_cer, cp_cer, alpha_mat, rho_cer, E_cer, E_cer, E_cer, nu_cer, nu_cer, nu_cer)
+fiber_cfg = cfg["fiber"].copy() # pop vf_fib before unpacking since it is not a MaterialConstants field
+vf_fib    = fiber_cfg.pop("vf")
+
+fiber   = MaterialConstants(**fiber_cfg)
+polymer = MaterialConstants(**cfg["polymer"])
+ceramic = MaterialConstants(**cfg["ceramic"])
 
 class MaterialState:
     def __init__(
@@ -285,7 +261,7 @@ eigenstrain_homogenized      = fem.Constant(domain_unit_cell, np.zeros(6, dtype=
 
 solve_unit_cell(domain_unit_cell, cell_tags_unit_cell, material_state, mpc, bcs_disp_unit_cell, u_temp_prev, beta_history, stiffness_tensor_homogenized, eigenstrain_homogenized)
 
-stiffness_spatial, eig_spatial, S_stiffness, S_eig = build_spatial_fields(
+stiffness_spatial, eig_spatial, S_stiffness, S_eig, angle_spatial = build_spatial_fields(
     domain,
     stiffness_tensor_homogenized.value,
     eigenstrain_homogenized.value
@@ -303,18 +279,28 @@ def is_boundary(x):
 def all_surfaces(x):
     return np.full(x.shape[1], True, dtype=bool)
 
-fdim_plane = domain.topology.dim - 1
+fdim_plane = 2
+fdim_point = 0
 
-disp_facets         = mesh.locate_entities_boundary(domain, fdim_plane, is_boundary)
-temp_facets         = mesh.locate_entities_boundary(domain, fdim_plane, all_surfaces)
-fixed_dofs_disp     = fem.locate_dofs_topological(S_disp, fdim_plane, disp_facets)
-fixed_dofs_temp     = fem.locate_dofs_topological(S_temp, fdim_plane, temp_facets)
+disp_plane         = mesh.locate_entities_boundary(domain, fdim_plane, is_boundary)
+disp_vertices      = mesh.locate_entities_boundary(domain, fdim_point, is_boundary)
+temp_plane         = mesh.locate_entities_boundary(domain, fdim_plane, all_surfaces)
+
+fixed_dofs_disp_x        = fem.locate_dofs_topological((S_disp.sub(0), S_disp), fdim_plane, disp_plane)
+fixed_dofs_disp_vertices = fem.locate_dofs_topological(S_disp, fdim_point, disp_vertices)
+fixed_dofs_temp          = fem.locate_dofs_topological(S_temp, fdim_plane, temp_plane)
 
 boundary_temp   = fem.Constant(domain, default_scalar_type(initial_temp))
 bcs_temp        = [fem.dirichletbc(boundary_temp, fixed_dofs_temp, S_temp)]
 
-bcs_disp = fem.dirichletbc(fem.Constant(domain, np.array([0.0, 0.0, 0.0], dtype=default_scalar_type)), fixed_dofs_disp, S_disp)
+bcs_disp_plane = fem.dirichletbc(
+    fem.Constant(domain, default_scalar_type(0.0)), 
+    fixed_dofs_disp_x[0],
+    S_disp.sub(0)
+)
+bcs_disp_vertices = fem.dirichletbc(fem.Constant(domain, np.array([0.0, 0.0, 0.0], dtype=default_scalar_type)), fixed_dofs_disp_vertices, S_disp)
 
+bcs_disp = [bcs_disp_plane, bcs_disp_vertices]
 
 ##==================================================##
 ##=== DEFINE THE VARIATIONAL FORM FOR TEMPERATURE===##
@@ -370,7 +356,7 @@ petsc_options={"ksp_type": "preonly", "pc_type": "lu"}
 
 a_disp = ufl.inner(epsilon_sym(v_disp_current), P_tot(u_disp_current, stiffness_spatial)) * dx
 L_disp = ufl.inner(epsilon_sym(v_disp_current), P_eigenstrain(eig_spatial, stiffness_spatial)) * dx
-problem_disp = LinearProblem(a_disp, L_disp, bcs=[bcs_disp], petsc_options=petsc_options)
+problem_disp = LinearProblem(a_disp, L_disp, bcs=bcs_disp, petsc_options=petsc_options)
 
 ##=================================================##
 ##=== DEFINE THE PROJECTION FOR OTHER VARIABLES ===##
@@ -398,6 +384,7 @@ problem_stress_projection = LinearProblem(a_proj, L_proj_von_mises, bcs=[])
 xdmf = io.XDMFFile(domain.comm, "results/results_3D.xdmf", "w")
 xdmf.write_mesh(domain)
 
+xdmf.write_function(angle_spatial, 0.0)
 xdmf.write_function(u_temp_prev, 0.0)
 xdmf.write_function(u_disp_current_store, 0.0)
 xdmf.write_function(vm_stress_current, 0.0)
@@ -534,24 +521,24 @@ xdmf.close()
 
 
 marker_size = 6
+axis_font_size = 18
+legend_font_size = 14
 ramp_up_end_index = int(temp_ramp_duration / dt)
 
 plt.figure(1)
 plt.plot(time_vector, temp_avg_values, marker='o', color='r')
-plt.xlabel('Time (hr)', fontsize=14)
-plt.ylabel('Temperature (C)', fontsize=14)
-plt.title('Temperature vs Time', fontsize=16)
+plt.xlabel('Time (hr)', fontsize=axis_font_size)
+plt.ylabel('Temperature (C)', fontsize=axis_font_size)
 plt.grid(True)
 plt.savefig('results/temp_vs_time.png')
 
 plt.figure(2)
-plt.plot(time_vector, vf_poly_avg_values, color='green', linewidth = 3, label='Polymer Volume Fraction')
-plt.plot(time_vector, vf_cer_avg_values, color='orange', linewidth = 3, label='Ceramic Volume Fraction')
-plt.plot(time_vector, vf_void_avg_values, color='gray', linewidth = 3, label='Void Volume Fraction')
-plt.xlabel('Time (hr)', fontsize=14)
-plt.ylabel('Volume Fraction', fontsize=14)
-plt.title('Volume Fractions vs Time', fontsize=16)
-plt.legend(fontsize=12)
+plt.plot(time_vector, vf_poly_avg_values, color='green', linewidth = 3, label='Precursor')
+plt.plot(time_vector, vf_cer_avg_values, color='orange', linewidth = 3, label='Ceramic')
+plt.plot(time_vector, vf_void_avg_values, color='gray', linewidth = 3, label='Voids')
+plt.xlabel('Time (hr)', fontsize=axis_font_size)
+plt.ylabel('Volume Fraction (%)', fontsize=axis_font_size)
+plt.legend(fontsize=legend_font_size)
 plt.grid(True)
 plt.ylim([0,1])
 plt.savefig('results/volume_fractions_vs_time.png')
@@ -561,31 +548,28 @@ ax1 = plt.gca()
 ax2 = ax1.twinx()
 ax2.plot(time_vector, temp_avg_values, '--r', linewidth=3, label='Temperature')
 ax1.plot(time_vector, E1_avg_values, '-b', linewidth=3, label='Elastic Modulus')
-ax1.set_xlabel('Time (hr)', fontsize=14)
-ax1.set_ylabel('Axial Elastic Modulus, E1 (Pa)', fontsize=14)
-ax2.set_ylabel('Temperature (C)', fontsize=14)
-plt.title('Elastic Modulus and Temperature vs Time', fontsize=16)
+ax1.set_xlabel('Time (hr)', fontsize=axis_font_size)
+ax1.set_ylabel('Axial Elastic Modulus, E1 (Pa)', fontsize=axis_font_size)
+ax2.set_ylabel('Temperature (C)', fontsize=axis_font_size)
 plt.grid(True)
 plt.savefig('results/E_and_temp_vs_time.png')
 
 plt.figure(4)
 plt.plot(temp_avg_values[0:ramp_up_end_index], r_avg_values[0:ramp_up_end_index], marker='o', color='orange')
-plt.xlabel('Temperature (C)', fontsize=14)
-plt.ylabel('r', fontsize=14)
-plt.title('Ceramization Degree vs Temperature', fontsize=16)
+plt.xlabel('Temperature (C)', fontsize=axis_font_size)
+plt.ylabel('r', fontsize=axis_font_size)
 plt.grid(True)
 plt.savefig('results/r_vs_temp.png')
 
 plt.figure(5)
 cycle_num = np.arange(1, num_cycles + 1)
-plt.plot(cycle_num, E1_point_values, marker='s', markersize=marker_size, color='gray', label='E1')
-plt.plot(cycle_num, E2_point_values, marker='o', markersize=marker_size, color='red', label='E2 = E3')
-plt.plot(cycle_num, G12_point_values, marker='^', markersize=marker_size, color='blue', label='G12 = G13')
-plt.plot(cycle_num, G23_point_values, marker='v', markersize=marker_size, color='green', label='G23')
-plt.xlabel('Cycle Number', fontsize=14)
-plt.ylabel('Modulus (GPa)', fontsize=14)
-plt.title('Modulus vs Cycle Number', fontsize=16)
-plt.legend(fontsize=12)
+plt.plot(cycle_num, E1_point_values, marker='s', markersize=marker_size, color='gray', label=r'$E_1$')
+plt.plot(cycle_num, E2_point_values, marker='o', markersize=marker_size, color='red', label=r'$E_2 = E_3$')
+plt.plot(cycle_num, G12_point_values, marker='^', markersize=marker_size, color='blue', label=r'$G_{12} = G_{13}$')
+plt.plot(cycle_num, G23_point_values, marker='v', markersize=marker_size, color='green', label=r'$G_{23}$')
+plt.xlabel('Cycle Number', fontsize=axis_font_size)
+plt.ylabel('Modulus (GPa)', fontsize=axis_font_size)
+plt.legend(fontsize=legend_font_size)
 plt.xticks(cycle_num)
 plt.xlim([1, num_cycles])
 plt.yticks(np.arange(20e9, 230e9 + 1, 20e9))
@@ -594,12 +578,12 @@ plt.grid(True)
 plt.savefig('results/elastic_properties_vs_cycle.png')
 
 plt.figure(6)
-plt.plot(cycle_num, transverse_eigenstrain_values, marker='s', markersize=marker_size, color='gray')
-plt.xlabel('Cycle Number', fontsize=14)
-plt.ylabel('Transverse Eigenstrain', fontsize=14)
-plt.title('Transverse Eigenstrain vs Cycle Number', fontsize=16)
+plt.plot(cycle_num, transverse_eigenstrain_values, marker='s', markersize=marker_size, color='gray', label=r'$\varepsilon_2 = \varepsilon_3$')
+plt.xlabel('Cycle Number', fontsize=axis_font_size)
+plt.ylabel(r'$\varepsilon$', fontsize=axis_font_size)
 plt.xticks(cycle_num)
 plt.xlim([1, num_cycles])
+plt.legend(fontsize=legend_font_size)
 plt.grid(True)
 plt.savefig('results/transverse_eigenstrain_vs_cycle.png')
 
@@ -608,12 +592,11 @@ cycle_num = np.arange(0, num_cycles + 1)
 plt.plot(cycle_num, vf_poly_point_values, marker='s', markersize=marker_size, color='gray', label='Polymer Volume Fraction')
 plt.plot(cycle_num, vf_void_point_values, marker='o', markersize=marker_size, color='red', label='Void Volume Fraction')
 plt.plot(cycle_num, vf_cer_point_values, marker='^', markersize=marker_size, color='blue', label='Ceramic Volume Fraction')
-plt.xlabel('Cycle Number', fontsize=14)
-plt.ylabel('Volume Fraction', fontsize=14)
-plt.title('Volume Fractions vs Cycle Number', fontsize=16)
+plt.xlabel('Cycle Number', fontsize=axis_font_size)
+plt.ylabel('Volume Fraction (%)', fontsize=axis_font_size)
 plt.xticks(cycle_num)
 plt.xlim([0, num_cycles])
 plt.ylim([0,1])
-plt.legend(fontsize=12)
+plt.legend(fontsize=legend_font_size)
 plt.grid(True)
 plt.savefig('results/volume_fractions_vs_cycle.png')

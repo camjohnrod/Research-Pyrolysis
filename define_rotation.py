@@ -5,7 +5,7 @@ import math
 
 _Ri    = 30.0e-3
 _Ro    = 37.0e-3
-_theta = math.radians(54.0)
+_theta = math.radians(90 - 54.0)
 _half  = _theta / 2.0
 
 _a1    = math.pi / 2.0 - _half          # original arc start angle
@@ -17,7 +17,7 @@ _arc_start = _a1 + _rot_angle            # = pi/2 - theta  ≈ 36°
 _arc_end   = _a2 + _rot_angle            # = pi/2          = 90°
 
 # Fiber angle in the arm region (constant — arm is straight)
-_arm_fiber_angle = _arc_start - math.pi / 2.0   # = -theta ≈ -54°
+_arm_fiber_angle = _arc_start - math.pi / 2.0
 
 # Arc center position in rotated frame (was at origin, rotated about origin)
 _arc_cx = 0.0
@@ -88,11 +88,13 @@ def build_spatial_fields(domain, C_hom_value, eig_hom_value):
 
     dim = domain.topology.dim
 
-    S_stiffness   = fem.functionspace(domain, ("DG", 0, (6, 6)))
-    S_eig = fem.functionspace(domain, ("DG", 0, (6,)))
+    S_stiffness = fem.functionspace(domain, ("DG", 0, (6, 6)))
+    S_eig       = fem.functionspace(domain, ("DG", 0, (6,)))
+    S_angle     = fem.functionspace(domain, ("DG", 0))          # ← add
 
-    stiffness_spatial   = fem.Function(S_stiffness)
-    eig_spatial = fem.Function(S_eig)
+    stiffness_spatial = fem.Function(S_stiffness)
+    eig_spatial       = fem.Function(S_eig)
+    angle_spatial     = fem.Function(S_angle, name="Fiber Angle (deg)")  # ← add
 
     num_cells   = domain.topology.index_map(dim).size_local
     cell_coords = dmesh.compute_midpoints(domain, dim,
@@ -104,16 +106,18 @@ def build_spatial_fields(domain, C_hom_value, eig_hom_value):
         theta   = _fiber_angle_from_xy(x_coord, y_coord)
         M       = bond_matrix_z(theta)
 
-        stiffness_rot   = M @ C_hom_value @ M.T
-        eig_rot = M @ eig_hom_value
+        stiffness_rot = M @ C_hom_value @ M.T
+        eig_rot       = M @ eig_hom_value
 
         stiffness_spatial.x.array[cell_idx * 36 : cell_idx * 36 + 36] = stiffness_rot.flatten()
-        eig_spatial.x.array[cell_idx * 6  : cell_idx * 6  + 6 ] = eig_rot
+        eig_spatial.x.array[cell_idx * 6  : cell_idx * 6  + 6]        = eig_rot
+        angle_spatial.x.array[cell_idx]                                = math.degrees(theta)  # ← add
 
     stiffness_spatial.x.scatter_forward()
     eig_spatial.x.scatter_forward()
+    angle_spatial.x.scatter_forward()                                   # ← add
 
-    return stiffness_spatial, eig_spatial, S_stiffness, S_eig
+    return stiffness_spatial, eig_spatial, S_stiffness, S_eig, angle_spatial  # ← add
 
 
 def update_spatial_fields(stiffness_spatial, eig_spatial, domain, stiffness_tensor_homogenized, eig_homogenized):

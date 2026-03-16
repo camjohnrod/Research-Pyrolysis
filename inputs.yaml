@@ -1,0 +1,66 @@
+# ── Simulation Control ──────────────────────────────────────
+save_every: 4
+num_cycles: 2
+
+# ── Thermal Cycle Definition ────────────────────────────────
+temp_ramp_duration:       10800   # 3 hrs in seconds
+temp_long_hold_duration:  10800   # 3 hrs
+temp_short_hold_duration: 3600    # 1 hr
+
+initial_temp: 200.0
+final_temp:   1200.0
+
+# ── Fiber Properties ────────────────────────────────────────
+fiber:
+  vf:    0.61  # vf is popped before unpacking into MaterialConstants
+  k:     54.0
+  cp:    879.0
+  alpha: -0.64e-6
+  rho:   1780.0
+  E1:    264.5e+9
+  E2:    264.5e+9
+  E3:    264.5e+9
+  nu12:  0.26
+  nu13:  0.26
+  nu23:  0.26
+
+# ── Polymer Properties (isotropic: E1=E2=E3, nu12=nu13=nu23) ─
+polymer:
+  k:     12.6
+  cp:    1170.0
+  alpha: 3.95e-6
+  rho:   1150.0
+  E1:    4.94e+9
+  E2:    4.94e+9
+  E3:    4.94e+9
+  nu12:  0.3
+  nu13:  0.3
+  nu23:  0.3
+
+# ── Ceramic Properties (isotropic: E1=E2=E3, nu12=nu13=nu23) ─
+ceramic:
+  k:     120.0
+  cp:    750.0
+  alpha: 3.95e-6
+  rho:   2450.0
+  E1:    206.18e+9
+  E2:    206.18e+9
+  E3:    206.18e+9
+  nu12:  0.14
+  nu13:  0.14
+  nu23:  0.14
+
+# ── Pyrolysis Kinetics ──────────────────────────────────────
+pyrolysis:
+  n:        2
+  A_factor: 1.5795
+  E_a:      18216.0   # J/mol 
+  R_gas:    8.3145
+
+# ── Initial Volume Fractions ────────────────────────────────
+volume_fractions:
+  vf_cer_0:           0.0
+  vf_poly_0:          0.8
+  vf_void_0:          0.2   # must equal 1 - vf_poly_0 - vf_cer_0
+  a:                  0.8
+  infiltration_ratio: 0.8
