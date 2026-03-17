@@ -107,7 +107,7 @@ vm_stress_current.name = "von Mises Stress"
 ##======================================##
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=False)
 class MaterialConstants:
     k: float
     cp: float
@@ -119,18 +119,21 @@ class MaterialConstants:
     nu12: float
     nu13: float
     nu23: float
+    _G12: float = None
+    _G13: float = None
+    _G23: float = None
+
+    def __post_init__(self):
+        if self._G12 is None: self._G12 = self.E1 / (2.0 * (1.0 + self.nu12))
+        if self._G13 is None: self._G13 = self.E1 / (2.0 * (1.0 + self.nu13))
+        if self._G23 is None: self._G23 = self.E2 / (2.0 * (1.0 + self.nu23))
 
     @property
-    def G12(self) -> float:
-        return self.E1 / (2.0 * (1.0 + self.nu12))
-
+    def G12(self): return self._G12
     @property
-    def G13(self) -> float:
-        return self.E1 / (2.0 * (1.0 + self.nu13))
-
+    def G13(self): return self._G13
     @property
-    def G23(self) -> float:
-        return self.E2 / (2.0 * (1.0 + self.nu23))
+    def G23(self): return self._G23
 
 fiber_cfg    = cfg["fiber"].copy() # pop vf_fib before unpacking since it is not a MaterialConstants field
 vf_fib_micro = fiber_cfg.pop("vf")
@@ -256,12 +259,12 @@ delta_temp = u_temp_prev - initial_temp
 material_state_micro.update(material_state_micro.r_new.x.array, u_temp_prev.x.array, dt, vf_poly_0, vf_cer_0, vf_void_0)
 mpc_micro, bcs_disp_micro = get_mpc(domain_micro)
 
-beta_history                       = fem.Constant(domain_micro, 0.0)
+beta_history_micro                 = fem.Constant(domain_micro, 0.0)
 stiffness_tensor_homogenized_micro = fem.Constant(domain_micro, np.zeros((6, 6), dtype=default_scalar_type))
 eigenstrain_homogenized_micro      = fem.Constant(domain_micro, np.zeros(6, dtype=default_scalar_type))
 
 solve_unit_cell('micro', domain_micro, cell_tags_micro, material_state_micro, mpc_micro, bcs_disp_micro, 
-                u_temp_prev, beta_history, stiffness_tensor_homogenized_micro, None, eigenstrain_homogenized_micro)
+                u_temp_prev, beta_history_micro, stiffness_tensor_homogenized_micro, None, eigenstrain_homogenized_micro)
 
 # stiffness_spatial, eig_spatial, S_stiffness, S_eig, angle_spatial = build_spatial_fields(
 #     domain,
@@ -277,9 +280,12 @@ def get_mesoscale_properties(stiffness_tensor_homogenized_micro):
     nu12_tow = -tensor_inv[0,1] / tensor_inv[0,0]
     nu13_tow = -tensor_inv[0,2] / tensor_inv[0,0]
     nu23_tow = -tensor_inv[1,2] / tensor_inv[1,1]
-    return E1_tow, E2_tow, E3_tow, nu12_tow, nu13_tow, nu23_tow
+    G23_tow = 1 / tensor_inv[3,3]
+    G13_tow = 1 / tensor_inv[4,4]
+    G12_tow = 1 / tensor_inv[5,5]
+    return E1_tow, E2_tow, E3_tow, nu12_tow, nu13_tow, nu23_tow, G12_tow, G13_tow, G23_tow
 
-E1_tow, E2_tow, E3_tow, nu12_tow, nu13_tow, nu23_tow = get_mesoscale_properties(stiffness_tensor_homogenized_micro.value)
+E1_tow, E2_tow, E3_tow, nu12_tow, nu13_tow, nu23_tow, G12_tow, G13_tow, G23_tow = get_mesoscale_properties(stiffness_tensor_homogenized_micro.value)
 
 tow = MaterialConstants(k=np.mean(material_state_micro.k.x.array[:]),
                         cp=np.mean(material_state_micro.cp.x.array[:]),
@@ -290,21 +296,36 @@ tow = MaterialConstants(k=np.mean(material_state_micro.k.x.array[:]),
                         E3=E3_tow, 
                         nu12=nu12_tow, 
                         nu13=nu13_tow, 
-                        nu23=nu23_tow
+                        nu23=nu23_tow, 
+                        _G12=G12_tow,
+                        _G13=G13_tow,
+                        _G23=G23_tow
                        )
 
 with XDMFFile(MPI.COMM_WORLD, "mesh/meso_rve_3D.xdmf", "r") as xdmf:
     domain_meso    = xdmf.read_mesh(name="Grid")
     cell_tags_meso = xdmf.read_meshtags(domain_meso, name="Grid")   
 
-material_state_meso  = MaterialState(domain, tow, polymer, ceramic, vf_fib_meso)
+# material_state_meso  = MaterialState(domain, tow, polymer, ceramic, vf_fib_meso)
+material_state_meso  = MaterialState(domain, tow, tow, tow, 1.0)
 material_state_meso.update(material_state_meso.r_new.x.array, u_temp_prev.x.array, dt, vf_poly_0, vf_cer_0, vf_void_0)
 mpc_meso, bcs_disp_meso = get_mpc(domain_meso)
 
+print("Micro material properties:")
+inv_micro = np.linalg.inv(stiffness_tensor_homogenized_micro.value)
+print(f"E1: {1/inv_micro[0,0]:.2f} | E2: {1/inv_micro[1,1]:.2f} | E3: {1/inv_micro[2,2]:.2f}")
+print(f"Fiber E1: {material_state_micro.fiber.E1:.2f} | Fiber E2: {material_state_micro.fiber.E2:.2f} | Fiber E3: {material_state_micro.fiber.E3:.2f}")
+print("Meso material properties:")
+print(f"E1: {material_state_meso.E1.x.array[0]:.2f} | E2: {material_state_meso.E2.x.array[0]:.2f} | E3: {material_state_meso.E3.x.array[0]:.2f}")
+print(f"Fiber E1: {material_state_meso.fiber.E1:.2f} | Fiber E2: {material_state_meso.fiber.E2:.2f} | Fiber E3: {material_state_meso.fiber.E3:.2f}")
+
+beta_history_meso = fem.Constant(domain_meso, 0.0)
+total_tow_eigenstrain = fem.Constant(domain_meso, np.zeros(6, dtype=default_scalar_type)) # need to implement this later in the code as well
+total_tow_eigenstrain.value += eigenstrain_homogenized_micro.value
 stiffness_tensor_homogenized_meso = fem.Constant(domain_meso, np.zeros((6, 6), dtype=default_scalar_type))
 eigenstrain_homogenized_meso      = fem.Constant(domain_meso, np.zeros(6, dtype=default_scalar_type))
 solve_unit_cell('meso', domain_meso, cell_tags_meso, material_state_meso, mpc_meso, bcs_disp_meso,
-                u_temp_prev, beta_history, stiffness_tensor_homogenized_meso, eigenstrain_homogenized_micro, eigenstrain_homogenized_meso)
+                u_temp_prev, beta_history_meso, stiffness_tensor_homogenized_meso, total_tow_eigenstrain, eigenstrain_homogenized_meso)
 
 stiffness_spatial, eig_spatial, S_stiffness, S_eig, angle_spatial = build_spatial_fields(
     domain,
@@ -357,8 +378,9 @@ def epsilon(u):
 
 dx = ufl.Measure("dx", domain=domain)
 
-R_temp = material_state_micro.rho * material_state_micro.cp * (u_temp_current - u_temp_prev) / dt * v_temp_current * dx \
-        + ufl.dot(material_state_micro.k * epsilon(u_temp_current), epsilon(v_temp_current)) * dx
+# pretty sure the meso values should be used here
+R_temp = material_state_meso.rho * material_state_meso.cp * (u_temp_current - u_temp_prev) / dt * v_temp_current * dx \
+        + ufl.dot(material_state_meso.k * epsilon(u_temp_current), epsilon(v_temp_current)) * dx
 
 J_temp = ufl.derivative(R_temp, u_temp_current)
 
@@ -446,12 +468,23 @@ temp_avg_values = [np.mean(u_temp_prev.x.array[:])]
 vf_poly_avg_values = [np.mean(material_state_micro.vf_poly)]
 vf_cer_avg_values = [np.mean(material_state_micro.vf_cer)]
 vf_void_avg_values = [np.mean(material_state_micro.vf_void)]
-E1_avg_values = [1 / np.linalg.inv(stiffness_tensor_homogenized_micro.value)[0,0]]
-E1_point_values = []
-E2_point_values = []
-G12_point_values = []
-G23_point_values = []
-transverse_eigenstrain_values = []
+
+E1_avg_values_meso = [1 / np.linalg.inv(stiffness_tensor_homogenized_meso.value)[0,0]]
+E1_point_values_micro = []
+E2_point_values_micro = []
+E3_point_values_micro = []
+G12_point_values_micro = []
+G13_point_values_micro = []
+G23_point_values_micro = []
+transverse_eigenstrain_values_micro = []
+
+E1_point_values_meso = []
+E2_point_values_meso = []
+E3_point_values_meso = []
+G12_point_values_meso = []
+G13_point_values_meso = []
+G23_point_values_meso = []
+transverse_eigenstrain_values_meso = []
 
 time_vector = np.zeros(num_timesteps + 1)
 
@@ -519,11 +552,22 @@ for i in pbar:
         material_state_micro.update(material_state_micro.r_new.x.array, u_temp_prev.x.array, dt, vf_poly_0, vf_cer_0, vf_void_0)
         material_state_meso.update(material_state_meso.r_new.x.array, u_temp_prev.x.array, dt, vf_poly_0, vf_cer_0, vf_void_0)
 
-        E1_point_values.append(1 / np.linalg.inv(stiffness_tensor_homogenized_micro.value)[0,0])
-        E2_point_values.append(1 / np.linalg.inv(stiffness_tensor_homogenized_micro.value)[1,1])
-        G12_point_values.append(1 / np.linalg.inv(stiffness_tensor_homogenized_micro.value)[5,5])
-        G23_point_values.append(1 / np.linalg.inv(stiffness_tensor_homogenized_micro.value)[3,3])
-        transverse_eigenstrain_values.append(eigenstrain_homogenized_micro.value[2])
+        E1_point_values_micro.append(1 / np.linalg.inv(stiffness_tensor_homogenized_micro.value)[0,0])
+        E2_point_values_micro.append(1 / np.linalg.inv(stiffness_tensor_homogenized_micro.value)[1,1])
+        E3_point_values_micro.append(1 / np.linalg.inv(stiffness_tensor_homogenized_micro.value)[2,2])
+        G12_point_values_micro.append(1 / np.linalg.inv(stiffness_tensor_homogenized_micro.value)[5,5])
+        G13_point_values_micro.append(1 / np.linalg.inv(stiffness_tensor_homogenized_micro.value)[4,4])
+        G23_point_values_micro.append(1 / np.linalg.inv(stiffness_tensor_homogenized_micro.value)[3,3])
+        transverse_eigenstrain_values_micro.append(eigenstrain_homogenized_micro.value[2])
+
+        E1_point_values_meso.append(1 / np.linalg.inv(stiffness_tensor_homogenized_meso.value)[0,0])
+        E2_point_values_meso.append(1 / np.linalg.inv(stiffness_tensor_homogenized_meso.value)[1,1])
+        E3_point_values_meso.append(1 / np.linalg.inv(stiffness_tensor_homogenized_meso.value)[2,2])
+        G12_point_values_meso.append(1 / np.linalg.inv(stiffness_tensor_homogenized_meso.value)[5,5])
+        G13_point_values_meso.append(1 / np.linalg.inv(stiffness_tensor_homogenized_meso.value)[4,4])
+        G23_point_values_meso.append(1 / np.linalg.inv(stiffness_tensor_homogenized_meso.value)[3,3])
+        transverse_eigenstrain_values_meso.append(eigenstrain_homogenized_meso.value[2])
+
         vf_poly_point_values.append(np.mean(material_state_micro.vf_poly))
         vf_cer_point_values.append(np.mean(material_state_micro.vf_cer))
         vf_void_point_values.append(np.mean(material_state_micro.vf_void))
@@ -537,8 +581,8 @@ for i in pbar:
     if abs(r_avg - r_avg_ref) > 1e-3:
         r_avg_ref = r_avg
         solve_unit_cell('micro', domain_micro, cell_tags_micro, material_state_micro, mpc_micro, bcs_disp_micro, 
-                        u_temp_prev, beta_history, stiffness_tensor_homogenized_micro, None, eigenstrain_homogenized_micro)
-        E1_tow, E2_tow, E3_tow, nu12_tow, nu13_tow, nu23_tow = get_mesoscale_properties(stiffness_tensor_homogenized_micro.value)
+                        u_temp_prev, beta_history_micro, stiffness_tensor_homogenized_micro, None, eigenstrain_homogenized_micro)
+        E1_tow, E2_tow, E3_tow, nu12_tow, nu13_tow, nu23_tow, G12_tow, G13_tow, G23_tow = get_mesoscale_properties(stiffness_tensor_homogenized_micro.value)
         tow = MaterialConstants(k=np.mean(material_state_micro.k.x.array[:]),
                                 cp=np.mean(material_state_micro.cp.x.array[:]),
                                 alpha=np.mean(material_state_micro.alpha.x.array[:]),
@@ -548,10 +592,14 @@ for i in pbar:
                                 E3=E3_tow,  
                                 nu12=nu12_tow,
                                 nu13=nu13_tow,
-                                nu23=nu23_tow
+                                nu23=nu23_tow, 
+                                _G12=G12_tow,
+                                _G13=G13_tow,
+                                _G23=G23_tow
                             )
+        material_state_meso.fiber = tow
         solve_unit_cell('meso', domain_meso, cell_tags_meso, material_state_meso, mpc_meso, bcs_disp_meso,
-                        u_temp_prev, beta_history, stiffness_tensor_homogenized_meso, eigenstrain_homogenized_micro, eigenstrain_homogenized_meso)
+                        u_temp_prev, beta_history_meso, stiffness_tensor_homogenized_meso, eigenstrain_homogenized_micro, eigenstrain_homogenized_meso)
         
         update_spatial_fields(stiffness_spatial, eig_spatial, domain,
                               stiffness_tensor_homogenized_meso.value,
@@ -573,7 +621,7 @@ for i in pbar:
     vf_poly_avg_values.append(vf_poly_avg)
     vf_cer_avg_values.append(vf_cer_avg)
     vf_void_avg_values.append(vf_void_avg)
-    E1_avg_values.append(1 / np.linalg.inv(stiffness_tensor_homogenized_micro.value)[0,0])
+    E1_avg_values_meso.append(1 / np.linalg.inv(stiffness_tensor_homogenized_meso.value)[0,0])
 
     t += dt
 
@@ -612,7 +660,7 @@ plt.figure(3)
 ax1 = plt.gca()
 ax2 = ax1.twinx()
 ax2.plot(time_vector, temp_avg_values, '--r', linewidth=3, label='Temperature')
-ax1.plot(time_vector, E1_avg_values, '-b', linewidth=3, label='Elastic Modulus')
+ax1.plot(time_vector, E1_avg_values_meso, '-b', linewidth=3, label='Elastic Modulus')
 ax1.set_xlabel('Time (hr)', fontsize=axis_font_size)
 ax1.set_ylabel('Axial Elastic Modulus, E1 (Pa)', fontsize=axis_font_size)
 ax2.set_ylabel('Temperature (C)', fontsize=axis_font_size)
@@ -628,10 +676,12 @@ plt.savefig('results/r_vs_temp.png')
 
 plt.figure(5)
 cycle_num = np.arange(1, num_cycles + 1)
-plt.plot(cycle_num, E1_point_values, marker='s', markersize=marker_size, color='gray', label=r'$E_1$')
-plt.plot(cycle_num, E2_point_values, marker='o', markersize=marker_size, color='red', label=r'$E_2 = E_3$')
-plt.plot(cycle_num, G12_point_values, marker='^', markersize=marker_size, color='blue', label=r'$G_{12} = G_{13}$')
-plt.plot(cycle_num, G23_point_values, marker='v', markersize=marker_size, color='green', label=r'$G_{23}$')
+plt.plot(cycle_num, E1_point_values_micro, marker='s', markersize=marker_size, color='gray', label=r'$E_1$')
+plt.plot(cycle_num, E2_point_values_micro, marker='o', markersize=marker_size, color='red', label=r'$E_2$')
+plt.plot(cycle_num, E3_point_values_micro, '--', marker='o', markersize=marker_size, color='purple', label=r'$E_3$')
+plt.plot(cycle_num, G12_point_values_micro, marker='^', markersize=marker_size, color='blue', label=r'$G_{12}$')
+plt.plot(cycle_num, G13_point_values_micro, '--', marker='^', markersize=marker_size, color='orange', label=r'$G_{13}$')
+plt.plot(cycle_num, G23_point_values_micro, marker='v', markersize=marker_size, color='green', label=r'$G_{23}$')
 plt.xlabel('Cycle Number', fontsize=axis_font_size)
 plt.ylabel('Modulus (GPa)', fontsize=axis_font_size)
 plt.legend(fontsize=legend_font_size)
@@ -640,19 +690,47 @@ plt.xlim([1, num_cycles])
 plt.yticks(np.arange(20e9, 230e9 + 1, 20e9))
 plt.gca().yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x/1e9:.0f}'))
 plt.grid(True)
-plt.savefig('results/elastic_properties_vs_cycle.png')
+plt.savefig('results/elastic_properties_vs_cycle_micro.png')
 
 plt.figure(6)
-plt.plot(cycle_num, transverse_eigenstrain_values, marker='s', markersize=marker_size, color='gray', label=r'$\varepsilon_2 = \varepsilon_3$')
+cycle_num = np.arange(1, num_cycles + 1)
+plt.plot(cycle_num, E1_point_values_meso, marker='s', markersize=marker_size, color='gray', label=r'$E_1$')
+plt.plot(cycle_num, E2_point_values_meso, marker='o', markersize=marker_size, color='red', label=r'$E_2$')
+plt.plot(cycle_num, E3_point_values_meso, '--', marker='o', markersize=marker_size, color='purple', label=r'$E_3$')
+plt.plot(cycle_num, G12_point_values_meso, marker='^', markersize=marker_size, color='blue', label=r'$G_{12}$')
+plt.plot(cycle_num, G13_point_values_meso, '--', marker='^', markersize=marker_size, color='orange', label=r'$G_{13}$')
+plt.plot(cycle_num, G23_point_values_meso, marker='v', markersize=marker_size, color='green', label=r'$G_{23}$')
+plt.xlabel('Cycle Number', fontsize=axis_font_size)
+plt.ylabel('Modulus (GPa)', fontsize=axis_font_size)
+plt.legend(fontsize=legend_font_size)
+plt.xticks(cycle_num)
+plt.xlim([1, num_cycles])
+plt.yticks(np.arange(20e9, 230e9 + 1, 20e9))
+plt.gca().yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x/1e9:.0f}'))
+plt.grid(True)
+plt.savefig('results/elastic_properties_vs_cycle_meso.png')
+
+plt.figure(7)
+plt.plot(cycle_num, transverse_eigenstrain_values_micro, marker='s', markersize=marker_size, color='gray', label=r'$\varepsilon_2 = \varepsilon_3$')
 plt.xlabel('Cycle Number', fontsize=axis_font_size)
 plt.ylabel(r'$\varepsilon$', fontsize=axis_font_size)
 plt.xticks(cycle_num)
 plt.xlim([1, num_cycles])
 plt.legend(fontsize=legend_font_size)
 plt.grid(True)
-plt.savefig('results/transverse_eigenstrain_vs_cycle.png')
+plt.savefig('results/transverse_eigenstrain_vs_cycle_micro.png')
 
-plt.figure(7)
+plt.figure(8)
+plt.plot(cycle_num, transverse_eigenstrain_values_meso, marker='s', markersize=marker_size, color='gray', label=r'$\varepsilon_3$')
+plt.xlabel('Cycle Number', fontsize=axis_font_size)
+plt.ylabel(r'$\varepsilon$', fontsize=axis_font_size)
+plt.xticks(cycle_num)
+plt.xlim([1, num_cycles])
+plt.legend(fontsize=legend_font_size)
+plt.grid(True)
+plt.savefig('results/transverse_eigenstrain_vs_cycle_meso.png')
+
+plt.figure(9)
 cycle_num = np.arange(0, num_cycles + 1)
 plt.plot(cycle_num, vf_poly_point_values, marker='s', markersize=marker_size, color='gray', label='Polymer Volume Fraction')
 plt.plot(cycle_num, vf_void_point_values, marker='o', markersize=marker_size, color='red', label='Void Volume Fraction')

@@ -5,55 +5,62 @@ from   dolfinx import fem, mesh, default_scalar_type
 
 def get_mpc(domain):
 
-    length   = 16e-6
-    width    = 16e-6
-    height   = 16e-6  
+    x_min, x_max = domain.geometry.x[:, 0].min(), domain.geometry.x[:, 0].max()
+    y_min, y_max = domain.geometry.x[:, 1].min(), domain.geometry.x[:, 1].max()
+    z_min, z_max = domain.geometry.x[:, 2].min(), domain.geometry.x[:, 2].max()
+    length = x_max - x_min
+    width  = y_max - y_min
+    height = z_max - z_min
+
+    # print(f"max and min x: {x_max}, {x_min}")
+    # print(f"max and min y: {y_max}, {y_min}")
+    # print(f"max and min z: {z_max}, {z_min}")
     
     S_disp = fem.functionspace(domain, ("Lagrange", 1, (domain.geometry.dim, )))
 
     def vertices(x):
-        return np.isclose(x[0], 0) & (np.isclose(x[1], 0) | np.isclose(x[1], width)) & \
-                (np.isclose(x[2], 0) | np.isclose(x[2], height)) | \
-                np.isclose(x[0], length) & (np.isclose(x[1], 0) | np.isclose(x[1], width)) & \
-                (np.isclose(x[2], 0) | np.isclose(x[2], height))  
+        return np.isclose(x[0], x_min) & (np.isclose(x[1], y_min) | np.isclose(x[1], y_max)) & \
+                (np.isclose(x[2], z_min) | np.isclose(x[2], z_max)) | \
+                np.isclose(x[0], x_max) & (np.isclose(x[1], y_min) | np.isclose(x[1], y_max)) & \
+                (np.isclose(x[2], z_min) | np.isclose(x[2], z_max))  
 
     def left(x):
-        return (np.isclose(x[0], 0) & (x[1] > 0) & (x[1] < width) & (x[2] > 0) & (x[2] < height))    
+        return (np.isclose(x[0], x_min) & (x[1] > y_min) & (x[1] < width) & (x[2] > z_min) & (x[2] < height))    
     def right(x):
-        return (np.isclose(x[0], length) & (x[1] > 0) & (x[1] < width) & (x[2] > 0) & (x[2] < height))
+        return (np.isclose(x[0], length) & (x[1] > y_min) & (x[1] < width) & (x[2] > z_min) & (x[2] < height))
     def front(x):
-        return (np.isclose(x[1], 0) & (x[0] > 0) & (x[0] < length) & (x[2] > 0) & (x[2] < height))
+        return (np.isclose(x[1], y_min) & (x[0] > x_min) & (x[0] < length) & (x[2] > z_min) & (x[2] < height))
     def back(x):
-        return (np.isclose(x[1], width) & (x[0] > 0) & (x[0] < length) & (x[2] > 0) & (x[2] < height))
+        return (np.isclose(x[1], width) & (x[0] > x_min) & (x[0] < length) & (x[2] > z_min) & (x[2] < height))
     def bottom(x):
-        return (np.isclose(x[2], 0) & (x[0] > 0) & (x[0] < length) & (x[1] > 0) & (x[1] < width))
+        return (np.isclose(x[2], z_min) & (x[0] > x_min) & (x[0] < length) & (x[1] > y_min) & (x[1] < width))
     def top(x):
-        return (np.isclose(x[2], height) & (x[0] > 0) & (x[0] < length) & (x[1] > 0) & (x[1] < width))
+        return (np.isclose(x[2], height) & (x[0] > x_min) & (x[0] < length) & (x[1] > y_min) & (x[1] < width))
 
     def edge_x_1(x):
-        return (np.isclose(x[1], 0) & np.isclose(x[2], 0) & (x[0] > 0) & (x[0] < length))
+        return (np.isclose(x[1], y_min) & np.isclose(x[2], z_min) & (x[0] > x_min) & (x[0] < length))
     def edge_x_2(x):
-        return (np.isclose(x[1], width) & np.isclose(x[2], 0) & (x[0] > 0) & (x[0] < length))
+        return (np.isclose(x[1], width) & np.isclose(x[2], z_min) & (x[0] > x_min) & (x[0] < length))
     def edge_x_3(x):
-        return (np.isclose(x[1], width) & np.isclose(x[2], height) & (x[0] > 0) & (x[0] < length))
+        return (np.isclose(x[1], width) & np.isclose(x[2], height) & (x[0] > x_min) & (x[0] < length))
     def edge_x_4(x):
-        return (np.isclose(x[1], 0) & np.isclose(x[2], height) & (x[0] > 0) & (x[0] < length))
+        return (np.isclose(x[1], y_min) & np.isclose(x[2], height) & (x[0] > x_min) & (x[0] < length))
     def edge_y_1(x):
-        return (np.isclose(x[0], 0) & np.isclose(x[2], 0) & (x[1] > 0) & (x[1] < width))
+        return (np.isclose(x[0], x_min) & np.isclose(x[2], z_min) & (x[1] > y_min) & (x[1] < width))
     def edge_y_2(x):
-        return (np.isclose(x[0], length) & np.isclose(x[2], 0) & (x[1] > 0) & (x[1] < width))
+        return (np.isclose(x[0], length) & np.isclose(x[2], z_min) & (x[1] > y_min) & (x[1] < width))
     def edge_y_3(x):
-        return (np.isclose(x[0], length) & np.isclose(x[2], height) & (x[1] > 0) & (x[1] < width)) 
+        return (np.isclose(x[0], length) & np.isclose(x[2], height) & (x[1] > y_min) & (x[1] < width)) 
     def edge_y_4(x):
-        return (np.isclose(x[0], 0) & np.isclose(x[2], height) & (x[1] > 0) & (x[1] < width))
+        return (np.isclose(x[0], x_min) & np.isclose(x[2], height) & (x[1] > y_min) & (x[1] < width))
     def edge_z_1(x):
-        return (np.isclose(x[0], 0) & np.isclose(x[1], 0) & (x[2] > 0) & (x[2] < height))
+        return (np.isclose(x[0], x_min) & np.isclose(x[1], y_min) & (x[2] > z_min) & (x[2] < height))
     def edge_z_2(x):
-        return (np.isclose(x[0], length) & np.isclose(x[1], 0) & (x[2] > 0) & (x[2] < height))
+        return (np.isclose(x[0], length) & np.isclose(x[1], y_min) & (x[2] > z_min) & (x[2] < height))
     def edge_z_3(x):
-        return (np.isclose(x[0], length) & np.isclose(x[1], width) & (x[2] > 0) & (x[2] < height))
+        return (np.isclose(x[0], length) & np.isclose(x[1], width) & (x[2] > z_min) & (x[2] < height))
     def edge_z_4(x):
-        return (np.isclose(x[0], 0) & np.isclose(x[1], width) & (x[2] > 0) & (x[2] < height))
+        return (np.isclose(x[0], x_min) & np.isclose(x[1], width) & (x[2] > z_min) & (x[2] < height))
 
     fdim_point = 0
     fdim_line  = 1

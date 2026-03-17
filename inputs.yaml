@@ -1,6 +1,6 @@
 # ── Simulation Control ──────────────────────────────────────
 save_every: 4
-num_cycles: 2
+num_cycles: 1
 
 # ── Thermal Cycle Definition ────────────────────────────────
 temp_ramp_duration:       10800   # 3 hrs in seconds

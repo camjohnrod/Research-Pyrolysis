@@ -74,6 +74,8 @@ if tags is not None:
 else:
     cell_data = None
 
+# msh.points += np.array([0.5, 0.5, 0.01])
+
 out_mesh = meshio.Mesh(
     points=msh.points,
     cells=[(cell_type, cells)],
