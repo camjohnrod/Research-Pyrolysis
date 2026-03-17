@@ -34,7 +34,7 @@ r = r_real / (2 ** 0.5)
 # ================================================================
 
 gmsh.initialize()
-gmsh.model.add("rve_3D")
+gmsh.model.add("micro_rve_3D")
 
 # ================================================================
 # Geometry (same 2D setup)
@@ -141,11 +141,12 @@ matrix_volumes = volumes[:-1]   # the rest are the outer 4 volumes
 # Physical Groups (3D)
 # ================================================================
 
-gmsh.model.addPhysicalGroup(3, [fiber_volume], 1)
-gmsh.model.setPhysicalName(3, 1, "fiber")
+# switched to 1 for matrix and 2 for fiber to match with unit_cell_solve.py (check later !)
+gmsh.model.addPhysicalGroup(3, [fiber_volume], 2)
+gmsh.model.setPhysicalName(3, 2, "fiber")
 
-gmsh.model.addPhysicalGroup(3, matrix_volumes, 2)
-gmsh.model.setPhysicalName(3, 2, "matrix")
+gmsh.model.addPhysicalGroup(3, matrix_volumes, 1)
+gmsh.model.setPhysicalName(3, 1, "matrix")
 
 # Start face physical group (x = 0)
 gmsh.model.addPhysicalGroup(2, [s1, s2, s3, s4, sf], 3)
@@ -161,7 +162,7 @@ gmsh.model.setPhysicalName(2, 4, "end")
 # ================================================================
 
 gmsh.model.mesh.generate(3)
-gmsh.write("mesh/rve_3D.msh")
+gmsh.write("mesh/micro_rve_3D.msh")
 
 print(f"\nFiber volume fraction: ", vf)
 print("\n")
@@ -175,11 +176,11 @@ gmsh.finalize()
 # Convert .msh to .xdmf using meshio
 # ================================================================
 
-filename_old = "rve_3D.msh"
-filename_new = "rve_3D.xdmf"
+filename_old = "micro_rve_3D.msh"
+filename_new = "micro_rve_3D.xdmf"
 
 # Read mesh
-msh = meshio.read("mesh/rve_3D.msh")
+msh = meshio.read("mesh/micro_rve_3D.msh")
 
 # Determine available cell blocks and their types in a meshio-version-robust way
 cell_blocks = []  # list of (cell_type, data_array)

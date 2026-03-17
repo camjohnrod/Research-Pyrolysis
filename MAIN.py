@@ -132,8 +132,9 @@ class MaterialConstants:
     def G23(self) -> float:
         return self.E2 / (2.0 * (1.0 + self.nu23))
 
-fiber_cfg = cfg["fiber"].copy() # pop vf_fib before unpacking since it is not a MaterialConstants field
-vf_fib    = fiber_cfg.pop("vf")
+fiber_cfg    = cfg["fiber"].copy() # pop vf_fib before unpacking since it is not a MaterialConstants field
+vf_fib_micro = fiber_cfg.pop("vf")
+vf_fib_meso  = 0.7 # completely hard coded, need to calculate the real value
 
 fiber   = MaterialConstants(**fiber_cfg)
 polymer = MaterialConstants(**cfg["polymer"])
@@ -218,9 +219,9 @@ class MaterialState:
         self.alpha.x.array[:] = self.rule_of_mixtures_total(alpha_m,  self.fiber.alpha)
         self.rho.x.array[:]   = self.rule_of_mixtures_total(rho_m,self.fiber.rho)
 
-        self.E1.x.array[:]   = E1_m
-        self.E2.x.array[:]   = E2_m
-        self.E3.x.array[:]   = E3_m
+        self.E1.x.array[:]    = E1_m
+        self.E2.x.array[:]    = E2_m
+        self.E3.x.array[:]    = E3_m
         self.nu12.x.array[:]  = nu12_m
         self.nu13.x.array[:]  = nu13_m
         self.nu23.x.array[:]  = nu23_m
@@ -234,10 +235,10 @@ class MaterialState:
 
         return r_new
 
-material_state = MaterialState(domain, fiber, polymer, ceramic, vf_fib)
-vf_poly_point_values = [np.mean(material_state.vf_poly)]
-vf_cer_point_values = [np.mean(material_state.vf_cer)]
-vf_void_point_values = [np.mean(material_state.vf_void)]
+material_state_micro = MaterialState(domain, fiber, polymer, ceramic, vf_fib_micro)
+vf_poly_point_values = [np.mean(material_state_micro.vf_poly)]
+vf_cer_point_values = [np.mean(material_state_micro.vf_cer)]
+vf_void_point_values = [np.mean(material_state_micro.vf_void)]
 
 
 ##==============================================##
@@ -245,28 +246,71 @@ vf_void_point_values = [np.mean(material_state.vf_void)]
 ##==============================================##
 
 
-with XDMFFile(MPI.COMM_WORLD, "mesh/rve_3D.xdmf", "r") as xdmf:
-    domain_unit_cell    = xdmf.read_mesh(name="Grid")
-    cell_tags_unit_cell = xdmf.read_meshtags(domain_unit_cell, name="Grid")      
+with XDMFFile(MPI.COMM_WORLD, "mesh/micro_rve_3D.xdmf", "r") as xdmf:
+    domain_micro    = xdmf.read_mesh(name="Grid")
+    cell_tags_micro = xdmf.read_meshtags(domain_micro, name="Grid")      
 
 u_temp_prev.interpolate(lambda x: np.full(x.shape[1], initial_temp, dtype=default_scalar_type)) # is interpolate necessary
 delta_temp = u_temp_prev - initial_temp
 
-material_state.update(material_state.r_new.x.array, u_temp_prev.x.array, dt, vf_poly_0, vf_cer_0, vf_void_0)
-mpc, bcs_disp_unit_cell = get_mpc(domain_unit_cell)
+material_state_micro.update(material_state_micro.r_new.x.array, u_temp_prev.x.array, dt, vf_poly_0, vf_cer_0, vf_void_0)
+mpc_micro, bcs_disp_micro = get_mpc(domain_micro)
 
-beta_history                 = fem.Constant(domain_unit_cell, 0.0)
-stiffness_tensor_homogenized = fem.Constant(domain_unit_cell, np.zeros((6, 6), dtype=default_scalar_type))
-eigenstrain_homogenized      = fem.Constant(domain_unit_cell, np.zeros(6, dtype=default_scalar_type))
+beta_history                       = fem.Constant(domain_micro, 0.0)
+stiffness_tensor_homogenized_micro = fem.Constant(domain_micro, np.zeros((6, 6), dtype=default_scalar_type))
+eigenstrain_homogenized_micro      = fem.Constant(domain_micro, np.zeros(6, dtype=default_scalar_type))
 
-solve_unit_cell(domain_unit_cell, cell_tags_unit_cell, material_state, mpc, bcs_disp_unit_cell, u_temp_prev, beta_history, stiffness_tensor_homogenized, eigenstrain_homogenized)
+solve_unit_cell('micro', domain_micro, cell_tags_micro, material_state_micro, mpc_micro, bcs_disp_micro, 
+                u_temp_prev, beta_history, stiffness_tensor_homogenized_micro, None, eigenstrain_homogenized_micro)
+
+# stiffness_spatial, eig_spatial, S_stiffness, S_eig, angle_spatial = build_spatial_fields(
+#     domain,
+#     stiffness_tensor_homogenized_micro.value,
+#     eigenstrain_homogenized_micro.value
+# )
+
+def get_mesoscale_properties(stiffness_tensor_homogenized_micro):
+    tensor_inv = np.linalg.inv(stiffness_tensor_homogenized_micro)
+    E1_tow = 1 / tensor_inv[0,0]
+    E2_tow = 1 / tensor_inv[1,1]
+    E3_tow = 1 / tensor_inv[2,2]
+    nu12_tow = -tensor_inv[0,1] / tensor_inv[0,0]
+    nu13_tow = -tensor_inv[0,2] / tensor_inv[0,0]
+    nu23_tow = -tensor_inv[1,2] / tensor_inv[1,1]
+    return E1_tow, E2_tow, E3_tow, nu12_tow, nu13_tow, nu23_tow
+
+E1_tow, E2_tow, E3_tow, nu12_tow, nu13_tow, nu23_tow = get_mesoscale_properties(stiffness_tensor_homogenized_micro.value)
+
+tow = MaterialConstants(k=np.mean(material_state_micro.k.x.array[:]),
+                        cp=np.mean(material_state_micro.cp.x.array[:]),
+                        alpha=np.mean(material_state_micro.alpha.x.array[:]),
+                        rho=np.mean(material_state_micro.rho.x.array[:]), 
+                        E1=E1_tow,
+                        E2=E2_tow, 
+                        E3=E3_tow, 
+                        nu12=nu12_tow, 
+                        nu13=nu13_tow, 
+                        nu23=nu23_tow
+                       )
+
+with XDMFFile(MPI.COMM_WORLD, "mesh/meso_rve_3D.xdmf", "r") as xdmf:
+    domain_meso    = xdmf.read_mesh(name="Grid")
+    cell_tags_meso = xdmf.read_meshtags(domain_meso, name="Grid")   
+
+material_state_meso  = MaterialState(domain, tow, polymer, ceramic, vf_fib_meso)
+material_state_meso.update(material_state_meso.r_new.x.array, u_temp_prev.x.array, dt, vf_poly_0, vf_cer_0, vf_void_0)
+mpc_meso, bcs_disp_meso = get_mpc(domain_meso)
+
+stiffness_tensor_homogenized_meso = fem.Constant(domain_meso, np.zeros((6, 6), dtype=default_scalar_type))
+eigenstrain_homogenized_meso      = fem.Constant(domain_meso, np.zeros(6, dtype=default_scalar_type))
+solve_unit_cell('meso', domain_meso, cell_tags_meso, material_state_meso, mpc_meso, bcs_disp_meso,
+                u_temp_prev, beta_history, stiffness_tensor_homogenized_meso, eigenstrain_homogenized_micro, eigenstrain_homogenized_meso)
 
 stiffness_spatial, eig_spatial, S_stiffness, S_eig, angle_spatial = build_spatial_fields(
     domain,
-    stiffness_tensor_homogenized.value,
-    eigenstrain_homogenized.value
+    stiffness_tensor_homogenized_meso.value,
+    eigenstrain_homogenized_meso.value
 )
-
 
 ##======================================##
 ##======== BOUNDARY CONDITIONS =========##
@@ -302,6 +346,7 @@ bcs_disp_vertices = fem.dirichletbc(fem.Constant(domain, np.array([0.0, 0.0, 0.0
 
 bcs_disp = [bcs_disp_plane, bcs_disp_vertices]
 
+
 ##==================================================##
 ##=== DEFINE THE VARIATIONAL FORM FOR TEMPERATURE===##
 ##==================================================##
@@ -312,8 +357,8 @@ def epsilon(u):
 
 dx = ufl.Measure("dx", domain=domain)
 
-R_temp = material_state.rho * material_state.cp * (u_temp_current - u_temp_prev) / dt * v_temp_current * dx \
-        + ufl.dot(material_state.k * epsilon(u_temp_current), epsilon(v_temp_current)) * dx
+R_temp = material_state_micro.rho * material_state_micro.cp * (u_temp_current - u_temp_prev) / dt * v_temp_current * dx \
+        + ufl.dot(material_state_micro.k * epsilon(u_temp_current), epsilon(v_temp_current)) * dx
 
 J_temp = ufl.derivative(R_temp, u_temp_current)
 
@@ -395,13 +440,13 @@ xdmf.write_function(vm_stress_current, 0.0)
 ##======================================##
 
 
-r_avg_values = [np.mean(material_state.r_new.x.array[:])]
+r_avg_values = [np.mean(material_state_micro.r_new.x.array[:])]
 r_avg_ref = r_avg_values[0]
 temp_avg_values = [np.mean(u_temp_prev.x.array[:])]
-vf_poly_avg_values = [np.mean(material_state.vf_poly)]
-vf_cer_avg_values = [np.mean(material_state.vf_cer)]
-vf_void_avg_values = [np.mean(material_state.vf_void)]
-E1_avg_values = [1 / np.linalg.inv(stiffness_tensor_homogenized.value)[0,0]]
+vf_poly_avg_values = [np.mean(material_state_micro.vf_poly)]
+vf_cer_avg_values = [np.mean(material_state_micro.vf_cer)]
+vf_void_avg_values = [np.mean(material_state_micro.vf_void)]
+E1_avg_values = [1 / np.linalg.inv(stiffness_tensor_homogenized_micro.value)[0,0]]
 E1_point_values = []
 E2_point_values = []
 G12_point_values = []
@@ -466,31 +511,51 @@ for i in pbar:
     ##=========================================================================================##
 
     if current_cycle != old_cycle:
-        vf_poly_0 = infiltration_ratio * material_state.vf_void
-        vf_void_0 = (1 - infiltration_ratio) * material_state.vf_void
-        vf_cer_0  = material_state.vf_cer
-        material_state = MaterialState(domain, fiber, polymer, ceramic, vf_fib)
-        material_state.update(material_state.r_new.x.array, u_temp_prev.x.array, dt, vf_poly_0, vf_cer_0, vf_void_0)
-        E1_point_values.append(1 / np.linalg.inv(stiffness_tensor_homogenized.value)[0,0])
-        E2_point_values.append(1 / np.linalg.inv(stiffness_tensor_homogenized.value)[1,1])
-        G12_point_values.append(1 / np.linalg.inv(stiffness_tensor_homogenized.value)[5,5])
-        G23_point_values.append(1 / np.linalg.inv(stiffness_tensor_homogenized.value)[3,3])
-        transverse_eigenstrain_values.append(eigenstrain_homogenized.value[2])
-        vf_poly_point_values.append(np.mean(material_state.vf_poly))
-        vf_cer_point_values.append(np.mean(material_state.vf_cer))
-        vf_void_point_values.append(np.mean(material_state.vf_void))
+        vf_poly_0 = infiltration_ratio * material_state_micro.vf_void
+        vf_void_0 = (1 - infiltration_ratio) * material_state_micro.vf_void
+        vf_cer_0  = material_state_micro.vf_cer
+        material_state_micro = MaterialState(domain, fiber, polymer, ceramic, vf_fib_micro)
+        material_state_meso  = MaterialState(domain, tow, polymer, ceramic, vf_fib_meso)
+        material_state_micro.update(material_state_micro.r_new.x.array, u_temp_prev.x.array, dt, vf_poly_0, vf_cer_0, vf_void_0)
+        material_state_meso.update(material_state_meso.r_new.x.array, u_temp_prev.x.array, dt, vf_poly_0, vf_cer_0, vf_void_0)
+
+        E1_point_values.append(1 / np.linalg.inv(stiffness_tensor_homogenized_micro.value)[0,0])
+        E2_point_values.append(1 / np.linalg.inv(stiffness_tensor_homogenized_micro.value)[1,1])
+        G12_point_values.append(1 / np.linalg.inv(stiffness_tensor_homogenized_micro.value)[5,5])
+        G23_point_values.append(1 / np.linalg.inv(stiffness_tensor_homogenized_micro.value)[3,3])
+        transverse_eigenstrain_values.append(eigenstrain_homogenized_micro.value[2])
+        vf_poly_point_values.append(np.mean(material_state_micro.vf_poly))
+        vf_cer_point_values.append(np.mean(material_state_micro.vf_cer))
+        vf_void_point_values.append(np.mean(material_state_micro.vf_void))
         old_cycle = int(current_cycle)
     else:
-        material_state.update(material_state.r_new.x.array, u_temp_prev.x.array, dt, vf_poly_0, vf_cer_0, vf_void_0)
+        material_state_micro.update(material_state_micro.r_new.x.array, u_temp_prev.x.array, dt, vf_poly_0, vf_cer_0, vf_void_0)
+        material_state_meso.update(material_state_meso.r_new.x.array, u_temp_prev.x.array, dt, vf_poly_0, vf_cer_0, vf_void_0)
     
-    r_avg = np.mean(material_state.r_new.x.array[:])
+    r_avg = np.mean(material_state_micro.r_new.x.array[:])
 
     if abs(r_avg - r_avg_ref) > 1e-3:
         r_avg_ref = r_avg
-        solve_unit_cell(domain_unit_cell, cell_tags_unit_cell, material_state, mpc, bcs_disp_unit_cell, u_temp_prev, beta_history, stiffness_tensor_homogenized, eigenstrain_homogenized)
+        solve_unit_cell('micro', domain_micro, cell_tags_micro, material_state_micro, mpc_micro, bcs_disp_micro, 
+                        u_temp_prev, beta_history, stiffness_tensor_homogenized_micro, None, eigenstrain_homogenized_micro)
+        E1_tow, E2_tow, E3_tow, nu12_tow, nu13_tow, nu23_tow = get_mesoscale_properties(stiffness_tensor_homogenized_micro.value)
+        tow = MaterialConstants(k=np.mean(material_state_micro.k.x.array[:]),
+                                cp=np.mean(material_state_micro.cp.x.array[:]),
+                                alpha=np.mean(material_state_micro.alpha.x.array[:]),
+                                rho=np.mean(material_state_micro.rho.x.array[:]), 
+                                E1=E1_tow,
+                                E2=E2_tow,
+                                E3=E3_tow,  
+                                nu12=nu12_tow,
+                                nu13=nu13_tow,
+                                nu23=nu23_tow
+                            )
+        solve_unit_cell('meso', domain_meso, cell_tags_meso, material_state_meso, mpc_meso, bcs_disp_meso,
+                        u_temp_prev, beta_history, stiffness_tensor_homogenized_meso, eigenstrain_homogenized_micro, eigenstrain_homogenized_meso)
+        
         update_spatial_fields(stiffness_spatial, eig_spatial, domain,
-                              stiffness_tensor_homogenized.value,
-                              eigenstrain_homogenized.value)
+                              stiffness_tensor_homogenized_meso.value,
+                              eigenstrain_homogenized_meso.value)
         
     ##==============================================##
     ##=== CALCULATE MEAN QUANTITIES FOR PLOTTING ===##
@@ -499,16 +564,16 @@ for i in pbar:
     time_vector[i + 1] = t / 60 / 60
     
     temp_avg = np.mean(u_temp_prev.x.array[:])
-    vf_poly_avg = np.mean(material_state.vf_poly)
-    vf_cer_avg = np.mean(material_state.vf_cer)
-    vf_void_avg = np.mean(material_state.vf_void)
+    vf_poly_avg = np.mean(material_state_micro.vf_poly)
+    vf_cer_avg = np.mean(material_state_micro.vf_cer)
+    vf_void_avg = np.mean(material_state_micro.vf_void)
 
     r_avg_values.append(r_avg)
     temp_avg_values.append(temp_avg)
     vf_poly_avg_values.append(vf_poly_avg)
     vf_cer_avg_values.append(vf_cer_avg)
     vf_void_avg_values.append(vf_void_avg)
-    E1_avg_values.append(1 / np.linalg.inv(stiffness_tensor_homogenized.value)[0,0])
+    E1_avg_values.append(1 / np.linalg.inv(stiffness_tensor_homogenized_micro.value)[0,0])
 
     t += dt
 
