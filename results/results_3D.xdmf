@@ -34,6 +34,272 @@
           <DataItem Dimensions="1275 1" Format="HDF">results_3D.h5:/Function/Temperature/480</DataItem>
         </Attribute>
       </Grid>
+      <Grid Name="Temperature" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="2400" />
+        <Attribute Name="Temperature" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="1275 1" Format="HDF">results_3D.h5:/Function/Temperature/2400</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Temperature" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="4320" />
+        <Attribute Name="Temperature" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="1275 1" Format="HDF">results_3D.h5:/Function/Temperature/4320</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Temperature" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="6240" />
+        <Attribute Name="Temperature" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="1275 1" Format="HDF">results_3D.h5:/Function/Temperature/6240</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Temperature" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="8160" />
+        <Attribute Name="Temperature" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="1275 1" Format="HDF">results_3D.h5:/Function/Temperature/8160</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Temperature" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="10080" />
+        <Attribute Name="Temperature" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="1275 1" Format="HDF">results_3D.h5:/Function/Temperature/10080</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Temperature" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="12000" />
+        <Attribute Name="Temperature" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="1275 1" Format="HDF">results_3D.h5:/Function/Temperature/12000</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Temperature" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="13920" />
+        <Attribute Name="Temperature" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="1275 1" Format="HDF">results_3D.h5:/Function/Temperature/13920</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Temperature" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="15840" />
+        <Attribute Name="Temperature" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="1275 1" Format="HDF">results_3D.h5:/Function/Temperature/15840</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Temperature" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="17760" />
+        <Attribute Name="Temperature" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="1275 1" Format="HDF">results_3D.h5:/Function/Temperature/17760</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Temperature" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="19680" />
+        <Attribute Name="Temperature" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="1275 1" Format="HDF">results_3D.h5:/Function/Temperature/19680</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Temperature" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="21600" />
+        <Attribute Name="Temperature" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="1275 1" Format="HDF">results_3D.h5:/Function/Temperature/21600</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Temperature" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="23520" />
+        <Attribute Name="Temperature" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="1275 1" Format="HDF">results_3D.h5:/Function/Temperature/23520</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Temperature" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="25440" />
+        <Attribute Name="Temperature" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="1275 1" Format="HDF">results_3D.h5:/Function/Temperature/25440</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Temperature" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="27360" />
+        <Attribute Name="Temperature" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="1275 1" Format="HDF">results_3D.h5:/Function/Temperature/27360</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Temperature" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="29280" />
+        <Attribute Name="Temperature" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="1275 1" Format="HDF">results_3D.h5:/Function/Temperature/29280</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Temperature" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="31200" />
+        <Attribute Name="Temperature" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="1275 1" Format="HDF">results_3D.h5:/Function/Temperature/31200</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Temperature" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="33120" />
+        <Attribute Name="Temperature" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="1275 1" Format="HDF">results_3D.h5:/Function/Temperature/33120</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Temperature" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="35040" />
+        <Attribute Name="Temperature" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="1275 1" Format="HDF">results_3D.h5:/Function/Temperature/35040</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Temperature" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="36960" />
+        <Attribute Name="Temperature" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="1275 1" Format="HDF">results_3D.h5:/Function/Temperature/36960</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Temperature" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="38880" />
+        <Attribute Name="Temperature" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="1275 1" Format="HDF">results_3D.h5:/Function/Temperature/38880</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Temperature" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="40800" />
+        <Attribute Name="Temperature" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="1275 1" Format="HDF">results_3D.h5:/Function/Temperature/40800</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Temperature" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="42720" />
+        <Attribute Name="Temperature" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="1275 1" Format="HDF">results_3D.h5:/Function/Temperature/42720</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Temperature" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="44640" />
+        <Attribute Name="Temperature" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="1275 1" Format="HDF">results_3D.h5:/Function/Temperature/44640</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Temperature" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="46560" />
+        <Attribute Name="Temperature" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="1275 1" Format="HDF">results_3D.h5:/Function/Temperature/46560</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Temperature" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="48480" />
+        <Attribute Name="Temperature" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="1275 1" Format="HDF">results_3D.h5:/Function/Temperature/48480</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Temperature" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="50400" />
+        <Attribute Name="Temperature" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="1275 1" Format="HDF">results_3D.h5:/Function/Temperature/50400</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Temperature" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="52320" />
+        <Attribute Name="Temperature" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="1275 1" Format="HDF">results_3D.h5:/Function/Temperature/52320</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Temperature" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="54240" />
+        <Attribute Name="Temperature" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="1275 1" Format="HDF">results_3D.h5:/Function/Temperature/54240</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Temperature" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="56160" />
+        <Attribute Name="Temperature" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="1275 1" Format="HDF">results_3D.h5:/Function/Temperature/56160</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Temperature" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="58080" />
+        <Attribute Name="Temperature" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="1275 1" Format="HDF">results_3D.h5:/Function/Temperature/58080</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Temperature" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="60000" />
+        <Attribute Name="Temperature" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="1275 1" Format="HDF">results_3D.h5:/Function/Temperature/60000</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Temperature" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="61920" />
+        <Attribute Name="Temperature" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="1275 1" Format="HDF">results_3D.h5:/Function/Temperature/61920</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Temperature" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="63840" />
+        <Attribute Name="Temperature" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="1275 1" Format="HDF">results_3D.h5:/Function/Temperature/63840</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Temperature" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="65760" />
+        <Attribute Name="Temperature" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="1275 1" Format="HDF">results_3D.h5:/Function/Temperature/65760</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Temperature" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="67680" />
+        <Attribute Name="Temperature" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="1275 1" Format="HDF">results_3D.h5:/Function/Temperature/67680</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Temperature" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="69600" />
+        <Attribute Name="Temperature" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="1275 1" Format="HDF">results_3D.h5:/Function/Temperature/69600</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Temperature" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="71520" />
+        <Attribute Name="Temperature" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="1275 1" Format="HDF">results_3D.h5:/Function/Temperature/71520</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Temperature" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="72000" />
+        <Attribute Name="Temperature" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="1275 1" Format="HDF">results_3D.h5:/Function/Temperature/72000</DataItem>
+        </Attribute>
+      </Grid>
     </Grid>
     <Grid Name="Displacement" GridType="Collection" CollectionType="Temporal">
       <Grid Name="Displacement" GridType="Uniform">
@@ -50,6 +316,272 @@
           <DataItem Dimensions="1275 3" Format="HDF">results_3D.h5:/Function/Displacement/480</DataItem>
         </Attribute>
       </Grid>
+      <Grid Name="Displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="2400" />
+        <Attribute Name="Displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="1275 3" Format="HDF">results_3D.h5:/Function/Displacement/2400</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="4320" />
+        <Attribute Name="Displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="1275 3" Format="HDF">results_3D.h5:/Function/Displacement/4320</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="6240" />
+        <Attribute Name="Displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="1275 3" Format="HDF">results_3D.h5:/Function/Displacement/6240</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="8160" />
+        <Attribute Name="Displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="1275 3" Format="HDF">results_3D.h5:/Function/Displacement/8160</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="10080" />
+        <Attribute Name="Displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="1275 3" Format="HDF">results_3D.h5:/Function/Displacement/10080</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="12000" />
+        <Attribute Name="Displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="1275 3" Format="HDF">results_3D.h5:/Function/Displacement/12000</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="13920" />
+        <Attribute Name="Displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="1275 3" Format="HDF">results_3D.h5:/Function/Displacement/13920</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="15840" />
+        <Attribute Name="Displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="1275 3" Format="HDF">results_3D.h5:/Function/Displacement/15840</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="17760" />
+        <Attribute Name="Displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="1275 3" Format="HDF">results_3D.h5:/Function/Displacement/17760</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="19680" />
+        <Attribute Name="Displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="1275 3" Format="HDF">results_3D.h5:/Function/Displacement/19680</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="21600" />
+        <Attribute Name="Displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="1275 3" Format="HDF">results_3D.h5:/Function/Displacement/21600</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="23520" />
+        <Attribute Name="Displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="1275 3" Format="HDF">results_3D.h5:/Function/Displacement/23520</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="25440" />
+        <Attribute Name="Displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="1275 3" Format="HDF">results_3D.h5:/Function/Displacement/25440</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="27360" />
+        <Attribute Name="Displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="1275 3" Format="HDF">results_3D.h5:/Function/Displacement/27360</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="29280" />
+        <Attribute Name="Displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="1275 3" Format="HDF">results_3D.h5:/Function/Displacement/29280</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="31200" />
+        <Attribute Name="Displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="1275 3" Format="HDF">results_3D.h5:/Function/Displacement/31200</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="33120" />
+        <Attribute Name="Displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="1275 3" Format="HDF">results_3D.h5:/Function/Displacement/33120</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="35040" />
+        <Attribute Name="Displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="1275 3" Format="HDF">results_3D.h5:/Function/Displacement/35040</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="36960" />
+        <Attribute Name="Displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="1275 3" Format="HDF">results_3D.h5:/Function/Displacement/36960</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="38880" />
+        <Attribute Name="Displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="1275 3" Format="HDF">results_3D.h5:/Function/Displacement/38880</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="40800" />
+        <Attribute Name="Displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="1275 3" Format="HDF">results_3D.h5:/Function/Displacement/40800</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="42720" />
+        <Attribute Name="Displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="1275 3" Format="HDF">results_3D.h5:/Function/Displacement/42720</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="44640" />
+        <Attribute Name="Displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="1275 3" Format="HDF">results_3D.h5:/Function/Displacement/44640</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="46560" />
+        <Attribute Name="Displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="1275 3" Format="HDF">results_3D.h5:/Function/Displacement/46560</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="48480" />
+        <Attribute Name="Displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="1275 3" Format="HDF">results_3D.h5:/Function/Displacement/48480</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="50400" />
+        <Attribute Name="Displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="1275 3" Format="HDF">results_3D.h5:/Function/Displacement/50400</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="52320" />
+        <Attribute Name="Displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="1275 3" Format="HDF">results_3D.h5:/Function/Displacement/52320</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="54240" />
+        <Attribute Name="Displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="1275 3" Format="HDF">results_3D.h5:/Function/Displacement/54240</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="56160" />
+        <Attribute Name="Displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="1275 3" Format="HDF">results_3D.h5:/Function/Displacement/56160</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="58080" />
+        <Attribute Name="Displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="1275 3" Format="HDF">results_3D.h5:/Function/Displacement/58080</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="60000" />
+        <Attribute Name="Displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="1275 3" Format="HDF">results_3D.h5:/Function/Displacement/60000</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="61920" />
+        <Attribute Name="Displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="1275 3" Format="HDF">results_3D.h5:/Function/Displacement/61920</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="63840" />
+        <Attribute Name="Displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="1275 3" Format="HDF">results_3D.h5:/Function/Displacement/63840</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="65760" />
+        <Attribute Name="Displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="1275 3" Format="HDF">results_3D.h5:/Function/Displacement/65760</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="67680" />
+        <Attribute Name="Displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="1275 3" Format="HDF">results_3D.h5:/Function/Displacement/67680</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="69600" />
+        <Attribute Name="Displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="1275 3" Format="HDF">results_3D.h5:/Function/Displacement/69600</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="71520" />
+        <Attribute Name="Displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="1275 3" Format="HDF">results_3D.h5:/Function/Displacement/71520</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="72000" />
+        <Attribute Name="Displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="1275 3" Format="HDF">results_3D.h5:/Function/Displacement/72000</DataItem>
+        </Attribute>
+      </Grid>
     </Grid>
     <Grid Name="von Mises Stress" GridType="Collection" CollectionType="Temporal">
       <Grid Name="von Mises Stress" GridType="Uniform">
@@ -64,6 +596,272 @@
         <Time Value="480" />
         <Attribute Name="von Mises Stress" AttributeType="Scalar" Center="Cell">
           <DataItem Dimensions="896 1" Format="HDF">results_3D.h5:/Function/von Mises Stress/480</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="von Mises Stress" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="2400" />
+        <Attribute Name="von Mises Stress" AttributeType="Scalar" Center="Cell">
+          <DataItem Dimensions="896 1" Format="HDF">results_3D.h5:/Function/von Mises Stress/2400</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="von Mises Stress" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="4320" />
+        <Attribute Name="von Mises Stress" AttributeType="Scalar" Center="Cell">
+          <DataItem Dimensions="896 1" Format="HDF">results_3D.h5:/Function/von Mises Stress/4320</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="von Mises Stress" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="6240" />
+        <Attribute Name="von Mises Stress" AttributeType="Scalar" Center="Cell">
+          <DataItem Dimensions="896 1" Format="HDF">results_3D.h5:/Function/von Mises Stress/6240</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="von Mises Stress" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="8160" />
+        <Attribute Name="von Mises Stress" AttributeType="Scalar" Center="Cell">
+          <DataItem Dimensions="896 1" Format="HDF">results_3D.h5:/Function/von Mises Stress/8160</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="von Mises Stress" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="10080" />
+        <Attribute Name="von Mises Stress" AttributeType="Scalar" Center="Cell">
+          <DataItem Dimensions="896 1" Format="HDF">results_3D.h5:/Function/von Mises Stress/10080</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="von Mises Stress" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="12000" />
+        <Attribute Name="von Mises Stress" AttributeType="Scalar" Center="Cell">
+          <DataItem Dimensions="896 1" Format="HDF">results_3D.h5:/Function/von Mises Stress/12000</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="von Mises Stress" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="13920" />
+        <Attribute Name="von Mises Stress" AttributeType="Scalar" Center="Cell">
+          <DataItem Dimensions="896 1" Format="HDF">results_3D.h5:/Function/von Mises Stress/13920</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="von Mises Stress" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="15840" />
+        <Attribute Name="von Mises Stress" AttributeType="Scalar" Center="Cell">
+          <DataItem Dimensions="896 1" Format="HDF">results_3D.h5:/Function/von Mises Stress/15840</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="von Mises Stress" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="17760" />
+        <Attribute Name="von Mises Stress" AttributeType="Scalar" Center="Cell">
+          <DataItem Dimensions="896 1" Format="HDF">results_3D.h5:/Function/von Mises Stress/17760</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="von Mises Stress" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="19680" />
+        <Attribute Name="von Mises Stress" AttributeType="Scalar" Center="Cell">
+          <DataItem Dimensions="896 1" Format="HDF">results_3D.h5:/Function/von Mises Stress/19680</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="von Mises Stress" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="21600" />
+        <Attribute Name="von Mises Stress" AttributeType="Scalar" Center="Cell">
+          <DataItem Dimensions="896 1" Format="HDF">results_3D.h5:/Function/von Mises Stress/21600</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="von Mises Stress" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="23520" />
+        <Attribute Name="von Mises Stress" AttributeType="Scalar" Center="Cell">
+          <DataItem Dimensions="896 1" Format="HDF">results_3D.h5:/Function/von Mises Stress/23520</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="von Mises Stress" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="25440" />
+        <Attribute Name="von Mises Stress" AttributeType="Scalar" Center="Cell">
+          <DataItem Dimensions="896 1" Format="HDF">results_3D.h5:/Function/von Mises Stress/25440</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="von Mises Stress" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="27360" />
+        <Attribute Name="von Mises Stress" AttributeType="Scalar" Center="Cell">
+          <DataItem Dimensions="896 1" Format="HDF">results_3D.h5:/Function/von Mises Stress/27360</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="von Mises Stress" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="29280" />
+        <Attribute Name="von Mises Stress" AttributeType="Scalar" Center="Cell">
+          <DataItem Dimensions="896 1" Format="HDF">results_3D.h5:/Function/von Mises Stress/29280</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="von Mises Stress" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="31200" />
+        <Attribute Name="von Mises Stress" AttributeType="Scalar" Center="Cell">
+          <DataItem Dimensions="896 1" Format="HDF">results_3D.h5:/Function/von Mises Stress/31200</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="von Mises Stress" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="33120" />
+        <Attribute Name="von Mises Stress" AttributeType="Scalar" Center="Cell">
+          <DataItem Dimensions="896 1" Format="HDF">results_3D.h5:/Function/von Mises Stress/33120</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="von Mises Stress" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="35040" />
+        <Attribute Name="von Mises Stress" AttributeType="Scalar" Center="Cell">
+          <DataItem Dimensions="896 1" Format="HDF">results_3D.h5:/Function/von Mises Stress/35040</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="von Mises Stress" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="36960" />
+        <Attribute Name="von Mises Stress" AttributeType="Scalar" Center="Cell">
+          <DataItem Dimensions="896 1" Format="HDF">results_3D.h5:/Function/von Mises Stress/36960</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="von Mises Stress" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="38880" />
+        <Attribute Name="von Mises Stress" AttributeType="Scalar" Center="Cell">
+          <DataItem Dimensions="896 1" Format="HDF">results_3D.h5:/Function/von Mises Stress/38880</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="von Mises Stress" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="40800" />
+        <Attribute Name="von Mises Stress" AttributeType="Scalar" Center="Cell">
+          <DataItem Dimensions="896 1" Format="HDF">results_3D.h5:/Function/von Mises Stress/40800</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="von Mises Stress" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="42720" />
+        <Attribute Name="von Mises Stress" AttributeType="Scalar" Center="Cell">
+          <DataItem Dimensions="896 1" Format="HDF">results_3D.h5:/Function/von Mises Stress/42720</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="von Mises Stress" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="44640" />
+        <Attribute Name="von Mises Stress" AttributeType="Scalar" Center="Cell">
+          <DataItem Dimensions="896 1" Format="HDF">results_3D.h5:/Function/von Mises Stress/44640</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="von Mises Stress" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="46560" />
+        <Attribute Name="von Mises Stress" AttributeType="Scalar" Center="Cell">
+          <DataItem Dimensions="896 1" Format="HDF">results_3D.h5:/Function/von Mises Stress/46560</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="von Mises Stress" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="48480" />
+        <Attribute Name="von Mises Stress" AttributeType="Scalar" Center="Cell">
+          <DataItem Dimensions="896 1" Format="HDF">results_3D.h5:/Function/von Mises Stress/48480</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="von Mises Stress" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="50400" />
+        <Attribute Name="von Mises Stress" AttributeType="Scalar" Center="Cell">
+          <DataItem Dimensions="896 1" Format="HDF">results_3D.h5:/Function/von Mises Stress/50400</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="von Mises Stress" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="52320" />
+        <Attribute Name="von Mises Stress" AttributeType="Scalar" Center="Cell">
+          <DataItem Dimensions="896 1" Format="HDF">results_3D.h5:/Function/von Mises Stress/52320</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="von Mises Stress" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="54240" />
+        <Attribute Name="von Mises Stress" AttributeType="Scalar" Center="Cell">
+          <DataItem Dimensions="896 1" Format="HDF">results_3D.h5:/Function/von Mises Stress/54240</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="von Mises Stress" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="56160" />
+        <Attribute Name="von Mises Stress" AttributeType="Scalar" Center="Cell">
+          <DataItem Dimensions="896 1" Format="HDF">results_3D.h5:/Function/von Mises Stress/56160</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="von Mises Stress" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="58080" />
+        <Attribute Name="von Mises Stress" AttributeType="Scalar" Center="Cell">
+          <DataItem Dimensions="896 1" Format="HDF">results_3D.h5:/Function/von Mises Stress/58080</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="von Mises Stress" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="60000" />
+        <Attribute Name="von Mises Stress" AttributeType="Scalar" Center="Cell">
+          <DataItem Dimensions="896 1" Format="HDF">results_3D.h5:/Function/von Mises Stress/60000</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="von Mises Stress" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="61920" />
+        <Attribute Name="von Mises Stress" AttributeType="Scalar" Center="Cell">
+          <DataItem Dimensions="896 1" Format="HDF">results_3D.h5:/Function/von Mises Stress/61920</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="von Mises Stress" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="63840" />
+        <Attribute Name="von Mises Stress" AttributeType="Scalar" Center="Cell">
+          <DataItem Dimensions="896 1" Format="HDF">results_3D.h5:/Function/von Mises Stress/63840</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="von Mises Stress" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="65760" />
+        <Attribute Name="von Mises Stress" AttributeType="Scalar" Center="Cell">
+          <DataItem Dimensions="896 1" Format="HDF">results_3D.h5:/Function/von Mises Stress/65760</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="von Mises Stress" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="67680" />
+        <Attribute Name="von Mises Stress" AttributeType="Scalar" Center="Cell">
+          <DataItem Dimensions="896 1" Format="HDF">results_3D.h5:/Function/von Mises Stress/67680</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="von Mises Stress" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="69600" />
+        <Attribute Name="von Mises Stress" AttributeType="Scalar" Center="Cell">
+          <DataItem Dimensions="896 1" Format="HDF">results_3D.h5:/Function/von Mises Stress/69600</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="von Mises Stress" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="71520" />
+        <Attribute Name="von Mises Stress" AttributeType="Scalar" Center="Cell">
+          <DataItem Dimensions="896 1" Format="HDF">results_3D.h5:/Function/von Mises Stress/71520</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="von Mises Stress" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="72000" />
+        <Attribute Name="von Mises Stress" AttributeType="Scalar" Center="Cell">
+          <DataItem Dimensions="896 1" Format="HDF">results_3D.h5:/Function/von Mises Stress/72000</DataItem>
         </Attribute>
       </Grid>
     </Grid>
