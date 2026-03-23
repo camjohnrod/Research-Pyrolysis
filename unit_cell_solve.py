@@ -13,6 +13,10 @@ from   mpi4py import MPI
 
 def solve_unit_cell(scale, domain, cell_tags, material_state, mpc, bcs_disp, u_temp_prev, beta_history, stiffness_tensor_homogenized, eigenstrain_homogenized, eigenstrain_microscale):
 
+    rotated_eigenstrain_microscale = fem.Constant(domain, np.zeros(6, dtype=default_scalar_type))
+    rotated_eigenstrain_microscale.value[0], rotated_eigenstrain_microscale.value[1], rotated_eigenstrain_microscale.value[2] = eigenstrain_microscale.value[1], eigenstrain_microscale.value[0], eigenstrain_microscale.value[2]
+    rotated_eigenstrain_microscale.value[3], rotated_eigenstrain_microscale.value[4], rotated_eigenstrain_microscale.value[5] = eigenstrain_microscale.value[3], eigenstrain_microscale.value[4], eigenstrain_microscale.value[5]
+
     x_min, x_max = domain.geometry.x[:, 0].min(), domain.geometry.x[:, 0].max()
     y_min, y_max = domain.geometry.x[:, 1].min(), domain.geometry.x[:, 1].max()
     z_min, z_max = domain.geometry.x[:, 2].min(), domain.geometry.x[:, 2].max()
@@ -20,6 +24,9 @@ def solve_unit_cell(scale, domain, cell_tags, material_state, mpc, bcs_disp, u_t
     width  = y_max - y_min
     height = z_max - z_min
     unit_cell_volume = length * width * height
+    # print(length)
+    # print(width)
+    # print(height)
 
     E1_avg       = np.mean(material_state.E1.x.array[:])
     E2_avg       = np.mean(material_state.E2.x.array[:])
@@ -96,10 +103,11 @@ def solve_unit_cell(scale, domain, cell_tags, material_state, mpc, bcs_disp, u_t
             2: (material_state.fiber.E1, material_state.fiber.E2, material_state.fiber.E3, material_state.fiber.nu12, material_state.fiber.nu13, material_state.fiber.nu23, material_state.fiber.G12, material_state.fiber.G13, material_state.fiber.G23, material_state.fiber.alpha)
         }
     elif scale == 'meso':
+        nu21 = material_state.fiber.nu12 * material_state.fiber.E2 / material_state.fiber.E1
         material_properties = {
             1: (E1_avg, E2_avg, E3_avg, nu12_avg, nu13_avg, nu23_avg, G12_avg, G13_avg, G23_avg, alpha_avg),
             2: (material_state.fiber.E1, material_state.fiber.E2, material_state.fiber.E3, material_state.fiber.nu12, material_state.fiber.nu13, material_state.fiber.nu23, material_state.fiber.G12, material_state.fiber.G13, material_state.fiber.G23, material_state.fiber.alpha),
-            3: (material_state.fiber.E1, material_state.fiber.E2, material_state.fiber.E3, material_state.fiber.nu12, material_state.fiber.nu13, material_state.fiber.nu23, material_state.fiber.G12, material_state.fiber.G13, material_state.fiber.G23, material_state.fiber.alpha)
+            3: (material_state.fiber.E2, material_state.fiber.E1, material_state.fiber.E3, nu21, material_state.fiber.nu23, material_state.fiber.nu13, material_state.fiber.G12, material_state.fiber.G13, material_state.fiber.G23, material_state.fiber.alpha)
         }
 
     stiffness_matrices = {}
@@ -126,7 +134,10 @@ def solve_unit_cell(scale, domain, cell_tags, material_state, mpc, bcs_disp, u_t
 
         if tag > 1:
             a_k += ufl.inner(epsilon_sym(k_), P_tot(k, stiffness_matrix)) * dx(tag)  
-            L_k += ufl.inner(epsilon_sym(k_), ufl.dot(stiffness_matrix, epsilon_thermal(alpha, delta_temp) + eigenstrain_microscale)) * dx(tag)
+            if tag == 2:
+                L_k += ufl.inner(epsilon_sym(k_), ufl.dot(stiffness_matrix, epsilon_thermal(alpha, delta_temp) + eigenstrain_microscale)) * dx(tag)
+            elif tag == 3:
+                L_k += ufl.inner(epsilon_sym(k_), ufl.dot(stiffness_matrix, epsilon_thermal(alpha, delta_temp) + rotated_eigenstrain_microscale)) * dx(tag)
         else:    
             a_k += ufl.inner(epsilon_sym(k_), P_tot(k, stiffness_matrix)) * dx(tag)
             L_k += ufl.inner(epsilon_sym(k_), ufl.dot(stiffness_matrix, epsilon_thermal(alpha, delta_temp) + epsilon_volume(beta_current, beta_history))) * dx(tag)
@@ -173,7 +184,10 @@ def solve_unit_cell(scale, domain, cell_tags, material_state, mpc, bcs_disp, u_t
             applied_eps_.value = elementary_load[j]
             if tag > 1:
                 temporary_vector[j] += fem.assemble_scalar(fem.form(ufl.inner(ufl.dot(stiffness_matrix, epsilon_sym(K_solve)), applied_eps_) * dx(tag)))
-                temporary_vector[j] -= fem.assemble_scalar(fem.form(ufl.inner(ufl.dot(stiffness_matrix, epsilon_thermal(alpha, delta_temp) + eigenstrain_microscale), applied_eps_) * dx(tag)))
+                if tag == 2:
+                    temporary_vector[j] -= fem.assemble_scalar(fem.form(ufl.inner(ufl.dot(stiffness_matrix, epsilon_thermal(alpha, delta_temp) + eigenstrain_microscale), applied_eps_) * dx(tag)))
+                elif tag == 3:
+                    temporary_vector[j] -= fem.assemble_scalar(fem.form(ufl.inner(ufl.dot(stiffness_matrix, epsilon_thermal(alpha, delta_temp) + rotated_eigenstrain_microscale), applied_eps_) * dx(tag)))
             else:
                 temporary_vector[j] += fem.assemble_scalar(fem.form(ufl.inner(ufl.dot(stiffness_matrix, epsilon_sym(K_solve)), applied_eps_) * dx(tag)))
                 temporary_vector[j] -= fem.assemble_scalar(fem.form(ufl.inner(ufl.dot(stiffness_matrix, epsilon_thermal(alpha, delta_temp) + epsilon_volume(beta_current, beta_history)), applied_eps_) * dx(tag)))

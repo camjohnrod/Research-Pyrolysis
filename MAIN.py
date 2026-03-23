@@ -297,7 +297,16 @@ tow = MaterialConstants(k=np.mean(material_state_micro.k.x.array[:]),
 
 with XDMFFile(MPI.COMM_WORLD, "mesh/meso_rve_3D.xdmf", "r") as xdmf:
     domain_meso    = xdmf.read_mesh(name="Grid")
-    cell_tags_meso = xdmf.read_meshtags(domain_meso, name="Grid")   
+    cell_tags_meso = xdmf.read_meshtags(domain_meso, name="Grid")  
+
+# vals, counts = np.unique(cell_tags_micro.values, return_counts=True)
+# print(list(zip(vals, counts)))
+# vals, counts = np.unique(cell_tags_meso.values, return_counts=True)
+# print(list(zip(vals, counts)))
+
+# print(f'E1: {E1_tow}')
+# print(f'E2: {E2_tow}')
+# print(f'E3: {E3_tow}')
 
 material_state_meso  = MaterialState(domain, tow, polymer, ceramic, vf_fib_meso)
 material_state_meso.update(material_state_meso.r_new.x.array, u_temp_prev.x.array, vf_poly_0, vf_cer_0, vf_void_0)
@@ -314,6 +323,7 @@ stiffness_spatial, eig_spatial, S_stiffness, S_eig, angle_spatial = build_spatia
     stiffness_tensor_homogenized_meso.value,
     eigenstrain_homogenized_meso.value
 )
+
 
 ##======================================##
 ##======== BOUNDARY CONDITIONS =========##
@@ -661,9 +671,9 @@ plt.figure(5)
 cycle_num = np.arange(1, num_cycles + 1)
 plt.plot(cycle_num, E1_point_values_micro, marker='s', markersize=marker_size, color='gray', label=r'$E_1$')
 plt.plot(cycle_num, E2_point_values_micro, marker='o', markersize=marker_size, color='red', label=r'$E_2$')
-plt.plot(cycle_num, E3_point_values_micro, '--', marker='o', markersize=marker_size, color='purple', label=r'$E_3$')
+plt.plot(cycle_num, E3_point_values_micro, marker='o', markersize=marker_size, color='red', label=r'$E_3$')
 plt.plot(cycle_num, G12_point_values_micro, marker='^', markersize=marker_size, color='blue', label=r'$G_{12}$')
-plt.plot(cycle_num, G13_point_values_micro, '--', marker='^', markersize=marker_size, color='orange', label=r'$G_{13}$')
+plt.plot(cycle_num, G13_point_values_micro, marker='^', markersize=marker_size, color='blue', label=r'$G_{13}$')
 plt.plot(cycle_num, G23_point_values_micro, marker='v', markersize=marker_size, color='green', label=r'$G_{23}$')
 plt.xlabel('Cycle Number', fontsize=axis_font_size)
 plt.ylabel('Modulus (GPa)', fontsize=axis_font_size)
@@ -678,10 +688,10 @@ plt.savefig('results/elastic_properties_vs_cycle_micro.png')
 plt.figure(6)
 cycle_num = np.arange(1, num_cycles + 1)
 plt.plot(cycle_num, E1_point_values_meso, marker='s', markersize=marker_size, color='gray', label=r'$E_1$')
-plt.plot(cycle_num, E2_point_values_meso, marker='o', markersize=marker_size, color='red', label=r'$E_2$')
-plt.plot(cycle_num, E3_point_values_meso, '--', marker='o', markersize=marker_size, color='purple', label=r'$E_3$')
+plt.plot(cycle_num, E2_point_values_meso, marker='s', markersize=marker_size, color='gray', label=r'$E_2$')
+plt.plot(cycle_num, E3_point_values_meso, marker='o', markersize=marker_size, color='red', label=r'$E_3$')
 plt.plot(cycle_num, G12_point_values_meso, marker='^', markersize=marker_size, color='blue', label=r'$G_{12}$')
-plt.plot(cycle_num, G13_point_values_meso, '--', marker='^', markersize=marker_size, color='orange', label=r'$G_{13}$')
+plt.plot(cycle_num, G13_point_values_meso, marker='v', markersize=marker_size, color='green', label=r'$G_{13}$')
 plt.plot(cycle_num, G23_point_values_meso, marker='v', markersize=marker_size, color='green', label=r'$G_{23}$')
 plt.xlabel('Cycle Number', fontsize=axis_font_size)
 plt.ylabel('Modulus (GPa)', fontsize=axis_font_size)

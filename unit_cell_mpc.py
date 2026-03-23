@@ -25,42 +25,42 @@ def get_mpc(domain):
                 (np.isclose(x[2], z_min) | np.isclose(x[2], z_max))  
 
     def left(x):
-        return (np.isclose(x[0], x_min) & (x[1] > y_min) & (x[1] < width) & (x[2] > z_min) & (x[2] < height))    
+        return (np.isclose(x[0], x_min) & (x[1] > y_min) & (x[1] < y_max) & (x[2] > z_min) & (x[2] < z_max))    
     def right(x):
-        return (np.isclose(x[0], length) & (x[1] > y_min) & (x[1] < width) & (x[2] > z_min) & (x[2] < height))
+        return (np.isclose(x[0], x_max) & (x[1] > y_min) & (x[1] < y_max) & (x[2] > z_min) & (x[2] < z_max))
     def front(x):
-        return (np.isclose(x[1], y_min) & (x[0] > x_min) & (x[0] < length) & (x[2] > z_min) & (x[2] < height))
+        return (np.isclose(x[1], y_min) & (x[0] > x_min) & (x[0] < x_max) & (x[2] > z_min) & (x[2] < z_max))
     def back(x):
-        return (np.isclose(x[1], width) & (x[0] > x_min) & (x[0] < length) & (x[2] > z_min) & (x[2] < height))
+        return (np.isclose(x[1], y_max) & (x[0] > x_min) & (x[0] < x_max) & (x[2] > z_min) & (x[2] < z_max))
     def bottom(x):
-        return (np.isclose(x[2], z_min) & (x[0] > x_min) & (x[0] < length) & (x[1] > y_min) & (x[1] < width))
+        return (np.isclose(x[2], z_min) & (x[0] > x_min) & (x[0] < x_max) & (x[1] > y_min) & (x[1] < y_max))
     def top(x):
-        return (np.isclose(x[2], height) & (x[0] > x_min) & (x[0] < length) & (x[1] > y_min) & (x[1] < width))
+        return (np.isclose(x[2], z_max) & (x[0] > x_min) & (x[0] < x_max) & (x[1] > y_min) & (x[1] < y_max))
 
     def edge_x_1(x):
-        return (np.isclose(x[1], y_min) & np.isclose(x[2], z_min) & (x[0] > x_min) & (x[0] < length))
+        return (np.isclose(x[1], y_min) & np.isclose(x[2], z_min) & (x[0] > x_min) & (x[0] < x_max))
     def edge_x_2(x):
-        return (np.isclose(x[1], width) & np.isclose(x[2], z_min) & (x[0] > x_min) & (x[0] < length))
+        return (np.isclose(x[1], y_max) & np.isclose(x[2], z_min) & (x[0] > x_min) & (x[0] < x_max))
     def edge_x_3(x):
-        return (np.isclose(x[1], width) & np.isclose(x[2], height) & (x[0] > x_min) & (x[0] < length))
+        return (np.isclose(x[1], y_max) & np.isclose(x[2], z_max) & (x[0] > x_min) & (x[0] < x_max))
     def edge_x_4(x):
-        return (np.isclose(x[1], y_min) & np.isclose(x[2], height) & (x[0] > x_min) & (x[0] < length))
+        return (np.isclose(x[1], y_min) & np.isclose(x[2], z_max) & (x[0] > x_min) & (x[0] < x_max))
     def edge_y_1(x):
-        return (np.isclose(x[0], x_min) & np.isclose(x[2], z_min) & (x[1] > y_min) & (x[1] < width))
+        return (np.isclose(x[0], x_min) & np.isclose(x[2], z_min) & (x[1] > y_min) & (x[1] < y_max))
     def edge_y_2(x):
-        return (np.isclose(x[0], length) & np.isclose(x[2], z_min) & (x[1] > y_min) & (x[1] < width))
+        return (np.isclose(x[0], x_max) & np.isclose(x[2], z_min) & (x[1] > y_min) & (x[1] < y_max))
     def edge_y_3(x):
-        return (np.isclose(x[0], length) & np.isclose(x[2], height) & (x[1] > y_min) & (x[1] < width)) 
+        return (np.isclose(x[0], x_max) & np.isclose(x[2], z_max) & (x[1] > y_min) & (x[1] < y_max)) 
     def edge_y_4(x):
-        return (np.isclose(x[0], x_min) & np.isclose(x[2], height) & (x[1] > y_min) & (x[1] < width))
+        return (np.isclose(x[0], x_min) & np.isclose(x[2], z_max) & (x[1] > y_min) & (x[1] < y_max))
     def edge_z_1(x):
-        return (np.isclose(x[0], x_min) & np.isclose(x[1], y_min) & (x[2] > z_min) & (x[2] < height))
+        return (np.isclose(x[0], x_min) & np.isclose(x[1], y_min) & (x[2] > z_min) & (x[2] < z_max))
     def edge_z_2(x):
-        return (np.isclose(x[0], length) & np.isclose(x[1], y_min) & (x[2] > z_min) & (x[2] < height))
+        return (np.isclose(x[0], x_max) & np.isclose(x[1], y_min) & (x[2] > z_min) & (x[2] < z_max))
     def edge_z_3(x):
-        return (np.isclose(x[0], length) & np.isclose(x[1], width) & (x[2] > z_min) & (x[2] < height))
+        return (np.isclose(x[0], x_max) & np.isclose(x[1], y_max) & (x[2] > z_min) & (x[2] < z_max))
     def edge_z_4(x):
-        return (np.isclose(x[0], x_min) & np.isclose(x[1], width) & (x[2] > z_min) & (x[2] < height))
+        return (np.isclose(x[0], x_min) & np.isclose(x[1], y_max) & (x[2] > z_min) & (x[2] < z_max))
 
     fdim_point = 0
     fdim_line  = 1
