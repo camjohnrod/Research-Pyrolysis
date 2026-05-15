@@ -50,7 +50,7 @@ final_temp   = cfg["final_temp"]
 total_cycle_length = (2 * temp_ramp_duration + temp_long_hold_duration + temp_short_hold_duration)
 tf                 = num_cycles * total_cycle_length
 
-num_timesteps = int(tf / 60 / 8)
+num_timesteps = int(tf / 60 / 10)
 dt            = tf / num_timesteps
 
 kin      = cfg["pyrolysis"]
@@ -318,6 +318,7 @@ eigenstrain_homogenized_meso      = fem.Constant(domain_meso, np.zeros(6, dtype=
 solve_unit_cell('meso', domain_meso, cell_tags_meso, material_state_meso, mpc_meso, bcs_disp_meso,
                 u_temp_prev, beta_history_meso, stiffness_tensor_homogenized_meso, eigenstrain_homogenized_meso, eigenstrain_homogenized_micro)
 
+# eigenstrain_homogenized_meso.value[0], eigenstrain_homogenized_meso.value[1] = 0, 0/
 stiffness_spatial, eig_spatial, S_stiffness, S_eig, angle_spatial = build_spatial_fields(
     domain,
     stiffness_tensor_homogenized_meso.value,
@@ -594,6 +595,7 @@ for i in pbar:
         solve_unit_cell('meso', domain_meso, cell_tags_meso, material_state_meso, mpc_meso, bcs_disp_meso,
                         u_temp_prev, beta_history_meso, stiffness_tensor_homogenized_meso, eigenstrain_homogenized_meso, eigenstrain_homogenized_micro)
         
+        # eigenstrain_homogenized_meso.value[0], eigenstrain_homogenized_meso.value[1] = 0, 0
         update_spatial_fields(stiffness_spatial, eig_spatial, domain,
                               stiffness_tensor_homogenized_meso.value,
                               eigenstrain_homogenized_meso.value)
@@ -670,10 +672,10 @@ plt.savefig('results/r_vs_temp.png')
 plt.figure(5)
 cycle_num = np.arange(1, num_cycles + 1)
 plt.plot(cycle_num, E1_point_values_micro, marker='s', markersize=marker_size, color='gray', label=r'$E_1$')
-plt.plot(cycle_num, E2_point_values_micro, marker='o', markersize=marker_size, color='red', label=r'$E_2$')
-plt.plot(cycle_num, E3_point_values_micro, marker='o', markersize=marker_size, color='red', label=r'$E_3$')
-plt.plot(cycle_num, G12_point_values_micro, marker='^', markersize=marker_size, color='blue', label=r'$G_{12}$')
-plt.plot(cycle_num, G13_point_values_micro, marker='^', markersize=marker_size, color='blue', label=r'$G_{13}$')
+plt.plot(cycle_num, E2_point_values_micro, marker='o', markersize=marker_size, color='red', label=r'$E_2=E_3$')
+# plt.plot(cycle_num, E3_point_values_micro, marker='o', markersize=marker_size, color='red', label=r'$E_3$')
+plt.plot(cycle_num, G12_point_values_micro, marker='^', markersize=marker_size, color='blue', label=r'$G_{12}=G_{13}$')
+# plt.plot(cycle_num, G13_point_values_micro, marker='^', markersize=marker_size, color='blue', label=r'$G_{13}$')
 plt.plot(cycle_num, G23_point_values_micro, marker='v', markersize=marker_size, color='green', label=r'$G_{23}$')
 plt.xlabel('Cycle Number', fontsize=axis_font_size)
 plt.ylabel('Modulus (GPa)', fontsize=axis_font_size)
@@ -687,12 +689,12 @@ plt.savefig('results/elastic_properties_vs_cycle_micro.png')
 
 plt.figure(6)
 cycle_num = np.arange(1, num_cycles + 1)
-plt.plot(cycle_num, E1_point_values_meso, marker='s', markersize=marker_size, color='gray', label=r'$E_1$')
-plt.plot(cycle_num, E2_point_values_meso, marker='s', markersize=marker_size, color='gray', label=r'$E_2$')
+plt.plot(cycle_num, E1_point_values_meso, marker='s', markersize=marker_size, color='gray', label=r'$E_1=E_2$')
+# plt.plot(cycle_num, E2_point_values_meso, marker='s', markersize=marker_size, color='gray', label=r'$E_2$')
 plt.plot(cycle_num, E3_point_values_meso, marker='o', markersize=marker_size, color='red', label=r'$E_3$')
 plt.plot(cycle_num, G12_point_values_meso, marker='^', markersize=marker_size, color='blue', label=r'$G_{12}$')
-plt.plot(cycle_num, G13_point_values_meso, marker='v', markersize=marker_size, color='green', label=r'$G_{13}$')
-plt.plot(cycle_num, G23_point_values_meso, marker='v', markersize=marker_size, color='green', label=r'$G_{23}$')
+plt.plot(cycle_num, G13_point_values_meso, marker='v', markersize=marker_size, color='green', label=r'$G_{13}=G_{23}$')
+# plt.plot(cycle_num, G23_point_values_meso, marker='v', markersize=marker_size, color='green', label=r'$G_{23}$')
 plt.xlabel('Cycle Number', fontsize=axis_font_size)
 plt.ylabel('Modulus (GPa)', fontsize=axis_font_size)
 plt.legend(fontsize=legend_font_size)
