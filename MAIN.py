@@ -413,11 +413,46 @@ def P_tot(u, C):
 def P_eigenstrain(eig, C):
     return ufl.dot(C, eig)
 
-petsc_options={"ksp_type": "gmres", "pc_type": "hypre", "pc_hypre_type": "boomeramg"}
+import time as _time   # add at the very top of MAIN.py with other imports
+
+from dolfinx.fem.petsc import (assemble_matrix, assemble_vector,
+                                apply_lifting, set_bc)
 
 a_disp = ufl.inner(epsilon_sym(v_disp_current), P_tot(u_disp_current, stiffness_spatial)) * dx
 L_disp = ufl.inner(epsilon_sym(v_disp_current), P_eigenstrain(eig_spatial, stiffness_spatial)) * dx
-problem_disp = LinearProblem(a_disp, L_disp, bcs=bcs_disp, petsc_options=petsc_options)
+
+# Pre-compile the forms once — this is separate from assembly.
+# fem.form() parses the UFL expression into a compiled C kernel.
+# It only needs to happen once regardless of how many times we assemble.
+a_disp_form = fem.form(a_disp)
+L_disp_form = fem.form(L_disp)
+
+# ── Initial assembly and factorization ────────────────────────────────────
+# assemble_matrix() evaluates the compiled kernel over all cells and
+# returns a PETSc AIJ sparse matrix with the Dirichlet rows/diagonals set.
+A_disp = assemble_matrix(a_disp_form, bcs=bcs_disp)
+A_disp.assemble()
+
+# Build the KSP manually so we control when setUp() (= factorization) is called.
+# ksp_type "preonly" + pc_type "lu" = pure direct solve, no Krylov iterations.
+# setUp() triggers MUMPS phases 1 (symbolic ordering) and 2 (numerical LU).
+ksp_disp = PETSc.KSP().create(domain.comm)
+ksp_disp.setOperators(A_disp)
+ksp_disp.setType("preonly")
+ksp_disp.getPC().setType("lu")
+ksp_disp.getPC().setFactorSolverType("mumps")
+ksp_disp.setUp()   # ← first and only factorization until stiffness_spatial changes
+
+# Function to hold the solution (reused each timestep, avoiding re-allocation)
+u_disp_sol   = fem.Function(S_disp)
+u_disp_petsc = A_disp.createVecRight()   # ← add this: PETSc Vec compatible with A's column space
+
+# ── Tracking variables ────────────────────────────────────────────────────
+matrix_needs_update = False   # set True when update_spatial_fields is called
+n_factorizations    = 1       # count the initial setUp() above
+n_solves            = 0
+t_factor_total      = 0.0     # cumulative time spent in ksp.setUp() (factorization)
+t_solve_total       = 0.0     # cumulative time spent in ksp.solve() (back-substitution)
 
 
 ##=================================================##
@@ -517,8 +552,56 @@ for i in pbar:
     u_temp_prev.x.array[:] = u_temp_current.x.array[:]
     u_temp_prev.x.scatter_forward()
 
-    u_disp_sol = problem_disp.solve()
+    # ── Re-factorize only when stiffness_spatial has actually changed ─────
+    # This block is skipped on the vast majority of timesteps.
+    # It only runs when the r_avg threshold was crossed (unit cell was re-solved).
+    if matrix_needs_update:
+        _t0 = _time.perf_counter()
+
+        # Re-assemble the stiffness matrix with the updated stiffness_spatial.
+        # stiffness_spatial is a DG0 fem.Function whose .x.array values were
+        # overwritten by update_spatial_fields() — assemble_matrix reads those
+        # updated values through the UFL form's coefficient references.
+        A_disp = assemble_matrix(a_disp_form, bcs=bcs_disp)
+        A_disp.assemble()
+
+        # Tell the KSP about the new matrix, then re-factorize.
+        # setUp() re-runs MUMPS phases 1+2 (ordering + numerical factorization).
+        # Because the sparsity pattern is unchanged (same mesh), MUMPS may
+        # internally reuse the symbolic ordering from phase 1 — only the
+        # numerical values in L and U are recomputed.
+        ksp_disp.setOperators(A_disp)
+        ksp_disp.setUp()
+
+        t_factor_total += _time.perf_counter() - _t0
+        # matrix_needs_update = False
+        n_factorizations += 1
+        if domain.comm.rank == 0:
+            print(f"  [DISP] Re-factored at r_avg={r_avg:.4f}  "
+                  f"(factorization #{n_factorizations})")
+
+    # ── Every timestep: assemble RHS and solve by back-substitution only ──
+    # ksp.solve() performs only MUMPS phase 3 (triangular solve: L y = b, U x = y).
+    # The L and U factors from the most recent setUp() are already in memory.
+    # This is O(n) per solve vs O(n^1.5) for factorization — much cheaper.
+    _t0 = _time.perf_counter()
+
+    b_disp = assemble_vector(L_disp_form)
+    # apply_lifting modifies b to enforce Dirichlet BCs consistently with
+    # how the rows of A were zeroed during assemble_matrix (the "lifting" step:
+    # b_free -= A_free_dirichlet * u_dirichlet_values)
+    apply_lifting(b_disp, [a_disp_form], [bcs_disp])
+    b_disp.ghostUpdate(addv=PETSc.InsertMode.ADD, mode=PETSc.ScatterMode.REVERSE)
+    set_bc(b_disp, bcs_disp)
+
+    # Phase 3 only — uses the cached LU factorization
+    ksp_disp.solve(b_disp, u_disp_petsc)
+    u_disp_petsc.ghostUpdate(addv=PETSc.InsertMode.INSERT, mode=PETSc.ScatterMode.FORWARD)
+    u_disp_sol.x.array[:] = u_disp_petsc.array_r   # copy locally owned values into the Function
     u_disp_sol.x.scatter_forward()
+
+    t_solve_total += _time.perf_counter() - _t0
+    n_solves += 1
 
     u_disp_prev.x.array[:] = u_disp_current_store.x.array[:]
     u_disp_prev.x.scatter_forward()
@@ -573,7 +656,7 @@ for i in pbar:
     
     r_avg = np.mean(material_state_micro.r_new.x.array[:])
     
-    if abs(r_avg - r_avg_ref) > 1e-3:
+    if abs(r_avg - r_avg_ref) > 1e-2:
         r_avg_ref = r_avg
         solve_unit_cell('micro', domain_micro, cell_tags_micro, material_state_micro, mpc_micro, bcs_disp_micro, 
                         u_temp_prev, beta_history_micro, stiffness_tensor_homogenized_micro, eigenstrain_homogenized_micro, fem.Constant(domain_micro, np.zeros(6, dtype=default_scalar_type)))
@@ -602,6 +685,8 @@ for i in pbar:
                               stiffness_tensor_homogenized_meso.value,
                               eigenstrain_homogenized_meso.value)
         
+        matrix_needs_update = True   # stiffness_spatial has changed; re-factor next solve
+        
     ##==============================================##
     ##=== CALCULATE MEAN QUANTITIES FOR PLOTTING ===##
     ##==============================================##
@@ -624,6 +709,22 @@ for i in pbar:
 
 xdmf.close()
 
+if domain.comm.rank == 0:
+    print("\n" + "="*55)
+    print("  KSP DISPLACEMENT SOLVE SUMMARY")
+    print("="*55)
+    print(f"  Total timesteps:          {n_solves}")
+    print(f"  Factorizations performed: {n_factorizations}")
+    print(f"  Redundant factorizations  ")
+    print(f"    avoided:                {n_solves - n_factorizations}")
+    print(f"  Avg timesteps per factor: {n_solves / n_factorizations:.1f}")
+    print(f"  Time in factorization:    {t_factor_total:.3f} s")
+    print(f"  Time in back-sub (solve): {t_solve_total:.3f} s")
+    if n_solves > 0:
+        print(f"  Avg time per factor:      {t_factor_total/n_factorizations*1000:.2f} ms")
+        print(f"  Avg time per solve:       {t_solve_total/n_solves*1000:.2f} ms")
+        print(f"  Factor/Solve time ratio:  {(t_factor_total/n_factorizations) / (t_solve_total/n_solves):.1f}x")
+    print("="*55)
 
 ##===========================================##
 ##=== PLOT QUANTITIES AT THE CENTER POINT ===##
@@ -681,7 +782,7 @@ plt.plot(cycle_num, G12_point_values_micro, marker='^', markersize=marker_size, 
 plt.plot(cycle_num, G23_point_values_micro, marker='v', markersize=marker_size, color='green', label=r'$G_{23}$')
 plt.xlabel('Cycle Number', fontsize=axis_font_size)
 plt.ylabel('Modulus (GPa)', fontsize=axis_font_size)
-plt.legend(fontsize=legend_font_size)
+plt.legend(fontsize=legend_font_size, loc='center right')
 plt.xticks(cycle_num)
 plt.xlim([1, num_cycles])
 plt.yticks(np.arange(20e9, 230e9 + 1, 20e9))
@@ -699,7 +800,7 @@ plt.plot(cycle_num, G13_point_values_meso, marker='v', markersize=marker_size, c
 # plt.plot(cycle_num, G23_point_values_meso, marker='v', markersize=marker_size, color='green', label=r'$G_{23}$')
 plt.xlabel('Cycle Number', fontsize=axis_font_size)
 plt.ylabel('Modulus (GPa)', fontsize=axis_font_size)
-plt.legend(fontsize=legend_font_size)
+plt.legend(fontsize=legend_font_size, loc='center right')
 plt.xticks(cycle_num)
 plt.xlim([1, num_cycles])
 plt.yticks(np.arange(20e9, 230e9 + 1, 20e9))

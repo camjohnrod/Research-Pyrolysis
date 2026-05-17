@@ -3,6 +3,7 @@ import time
 import ufl
 import dolfinx_mpc
 import dolfinx_mpc.utils
+from   dolfinx_mpc import LinearProblem as MPCLinearProblem
 from   dolfinx import fem, default_scalar_type
 from   petsc4py import PETSc
 from   mpi4py import MPI
@@ -148,6 +149,77 @@ def solve_unit_cell(scale, domain, cell_tags, material_state, mpc, bcs_disp, u_t
             a_k += ufl.inner(epsilon_sym(k_), P_tot(k, C)) * dx(tag)
             L_k += ufl.inner(epsilon_sym(k_), ufl.dot(C, epsilon_thermal(alpha, delta_temp) + epsilon_volume(beta_current, beta_history))) * dx(tag)
 
+    
+    # ping
+
+    # u_mpc_h = fem.Function(mpc.function_space)
+    # u_mpc_k = fem.Function(mpc.function_space)
+
+    # # petsc_options={}
+    # # petsc_options = {
+    # # "ksp_type": "preonly",
+    # # "pc_type": "lu", # or "cholesky" if SPD
+    # # "pc_factor_mat_solver_type": "umfpack" # or "umfpack"/"cholmod"
+    # # }
+    # petsc_options = {
+    #     "ksp_type": "gmres",
+    #     "pc_type": "ilu"
+    # }
+
+    # problem_h = MPCLinearProblem(a_h, L_h, mpc, bcs=[bcs_disp], u=u_mpc_h, petsc_options=petsc_options)
+    # problem_k = MPCLinearProblem(a_k, L_k, mpc, bcs=[bcs_disp], u=u_mpc_k, petsc_options=petsc_options)
+    # K_solve   = problem_k.solve()
+    
+    # elementary_load = np.array([[1.0, 0.0, 0.0, 0.0, 0.0, 0.0], 
+    #                             [0.0, 1.0, 0.0, 0.0, 0.0, 0.0],
+    #                             [0.0, 0.0, 1.0, 0.0, 0.0, 0.0], 
+    #                             [0.0, 0.0, 0.0, 1.0, 0.0, 0.0], 
+    #                             [0.0, 0.0, 0.0, 0.0, 1.0, 0.0], 
+    #                             [0.0, 0.0, 0.0, 0.0, 0.0, 1.0]])
+
+    # dim_load = elementary_load.shape[0]
+    # temporary_tensor = np.zeros((dim_load, dim_load))
+    # vol_inv = 1.0 / unit_cell_volume
+    # j_allowed = {i: [j for j in range(dim_load) if not (((i > 2) or (j > 2)) and (i != j))] for i in range(dim_load)}
+
+    # for i in trange(dim_load, colour="red", desc=f"Solving Unit Cell", position=1, leave=False, bar_format='{l_bar}{bar:30}{r_bar}', total=dim_load):
+    # # for i in range(dim_load):
+    #     applied_eps.value = elementary_load[i]
+    #     H_solve = problem_h.solve()
+
+    #     for j in j_allowed[i]:
+    #         applied_eps_.value = elementary_load[j]
+    #         for tag, stiffness_matrix in stiffness_matrices.items():
+    #             temporary_tensor[i, j] += vol_inv * fem.assemble_scalar(fem.form(ufl.inner(P_tot_multiple_rhs(H_solve, stiffness_matrix), applied_eps_) * dx(tag)))
+
+    # stiffness_tensor_homogenized.value = temporary_tensor
+
+    # temporary_vector = np.zeros((dim_load))
+    # for tag, (E1, E2, E3, nu12, nu13, nu23, G12, G13, G23, alpha) in material_properties.items():
+    #     stiffness_matrix = stiffness_matrices[tag]
+    #     for j in range(dim_load):
+    #         if j > 2:
+    #             continue
+    #         applied_eps_.value = elementary_load[j]
+    #         if tag > 1:
+    #             temporary_vector[j] += fem.assemble_scalar(fem.form(ufl.inner(ufl.dot(stiffness_matrix, epsilon_sym(K_solve)), applied_eps_) * dx(tag)))
+    #             if tag == 2:
+    #                 temporary_vector[j] -= fem.assemble_scalar(fem.form(ufl.inner(ufl.dot(stiffness_matrix, epsilon_thermal(alpha, delta_temp) + eigenstrain_microscale), applied_eps_) * dx(tag)))
+    #             elif tag == 3:
+    #                 temporary_vector[j] -= fem.assemble_scalar(fem.form(ufl.inner(ufl.dot(stiffness_matrix, epsilon_thermal(alpha, delta_temp) + rotated_eigenstrain_microscale), applied_eps_) * dx(tag)))
+    #         else:
+    #             temporary_vector[j] += fem.assemble_scalar(fem.form(ufl.inner(ufl.dot(stiffness_matrix, epsilon_sym(K_solve)), applied_eps_) * dx(tag)))
+    #             temporary_vector[j] -= fem.assemble_scalar(fem.form(ufl.inner(ufl.dot(stiffness_matrix, epsilon_thermal(alpha, delta_temp) + epsilon_volume(beta_current, beta_history)), applied_eps_) * dx(tag)))
+                
+    # eigenstrain_bar = -(1 / unit_cell_volume) * np.linalg.inv(temporary_tensor) @ temporary_vector
+    # eigenstrain_homogenized.value = eigenstrain_bar
+
+    # beta_history.value += float(beta_current)
+
+    # ping
+
+
+    # peng 
 
     ##==========================================================================##
     ##===  LU OPTIMIZATION: assemble shared stiffness matrix and factor once ===##
@@ -273,30 +345,153 @@ def solve_unit_cell(scale, domain, cell_tags, material_state, mpc, bcs_disp, u_t
     X.destroy()
 
 
+    # ##==========================================================================##
+    # ##===  POST-PROCESSING: assemble homogenized stiffness tensor            ===##
+    # ##==========================================================================##
+
+    # temporary_tensor = np.zeros((dim_load, dim_load))
+    # vol_inv  = 1.0 / unit_cell_volume
+    # j_allowed = {i: [j for j in range(dim_load)
+    #                  if not (((i > 2) or (j > 2)) and (i != j))]
+    #              for i in range(dim_load)}
+
+    # for i in trange(dim_load, colour="red", desc=f"Assembling C_hom ({scale})",
+    #                 position=1, leave=False,
+    #                 bar_format='{l_bar}{bar:30}{r_bar}', total=dim_load):
+    # # for i in range(dim_load):
+    #     applied_eps.value = elementary_load[i]   # needed for P_tot_multiple_rhs evaluation
+    #     H_solve = H_solves[i]
+
+    #     for j in j_allowed[i]:
+    #         applied_eps_.value = elementary_load[j]
+    #         for tag, C in stiffness_matrices.items():
+    #             temporary_tensor[i, j] += vol_inv * fem.assemble_scalar(
+    #                 fem.form(ufl.inner(P_tot_multiple_rhs(H_solve, C), applied_eps_) * dx(tag)))
+
+    # stiffness_tensor_homogenized.value = temporary_tensor
+
+    # ##==========================================================================##
+    # ##===  POST-PROCESSING: assemble homogenized eigenstrain                 ===##
+    # ##==========================================================================##
+
+    # temporary_vector = np.zeros(dim_load)
+
+    # for tag, (E1, E2, E3, nu12, nu13, nu23, G12, G13, G23, alpha) in material_properties.items():
+    #     C = stiffness_matrices[tag]
+    #     for j in range(dim_load):
+    #         if j > 2:
+    #             continue
+    #         applied_eps_.value = elementary_load[j]
+    #         if tag > 1:
+    #             temporary_vector[j] += fem.assemble_scalar(fem.form(
+    #                 ufl.inner(ufl.dot(C, epsilon_sym(K_solve)), applied_eps_) * dx(tag)))
+    #             if tag == 2:
+    #                 temporary_vector[j] -= fem.assemble_scalar(fem.form(
+    #                     ufl.inner(ufl.dot(C, epsilon_thermal(alpha, delta_temp) + eigenstrain_microscale), applied_eps_) * dx(tag)))
+    #             elif tag == 3:
+    #                 temporary_vector[j] -= fem.assemble_scalar(fem.form(
+    #                     ufl.inner(ufl.dot(C, epsilon_thermal(alpha, delta_temp) + rotated_eigenstrain_microscale), applied_eps_) * dx(tag)))
+    #         else:
+    #             temporary_vector[j] += fem.assemble_scalar(fem.form(
+    #                 ufl.inner(ufl.dot(C, epsilon_sym(K_solve)), applied_eps_) * dx(tag)))
+    #             temporary_vector[j] -= fem.assemble_scalar(fem.form(
+    #                 ufl.inner(ufl.dot(C, epsilon_thermal(alpha, delta_temp) + epsilon_volume(beta_current, beta_history)), applied_eps_) * dx(tag)))
+
+    # eigenstrain_bar              = -(1 / unit_cell_volume) * np.linalg.inv(temporary_tensor) @ temporary_vector
+    # eigenstrain_homogenized.value = eigenstrain_bar
+    # beta_history.value           += float(beta_current)
+
+    # ##==========================================================================##
+    # ##===  CLEANUP                                                            ===##
+    # ##==========================================================================##
+
+    # ksp.destroy()
+    # A.destroy()
+
+    # peng
+
+    ##==========================================================================##
+    ##===  FORM PRE-COMPILATION                                               ===##
+    ##===                                                                     ===##
+    ##===  fem.form() triggers FFCx JIT compilation — generates C code,      ===##
+    ##===  compiles it, and links it. Calling it inside a loop pays this      ===##
+    ##===  cost repeatedly for what is purely a numerical change (new         ===##
+    ##===  coefficient values). Pre-compiling once and updating coefficient   ===##
+    ##===  arrays before each assemble_scalar call avoids all recompilation.  ===##
+    ##==========================================================================##
+
+    # Placeholder Functions — compiled forms reference these objects.
+    # Updating .x.array[:] before assembly uses the new values without recompiling.
+    H_placeholder = fem.Function(mpc.function_space)
+    K_placeholder = fem.Function(mpc.function_space)
+
+    # ── Forms for temporary_tensor (stiffness columns) ────────────────────────
+    # One form per tag. applied_eps and applied_eps_ are Constants — updating
+    # their .value before assembly is sufficient, no recompilation needed.
+    forms_stiffness = {
+        tag: fem.form(ufl.inner(P_tot_multiple_rhs(H_placeholder, C), applied_eps_) * dx(tag))
+        for tag, C in stiffness_matrices.items()
+    }
+
+    # ── Forms for temporary_vector (eigenstrain) — K_solve dependent ─────────
+    # One form per tag for the epsilon_sym(K_solve) terms.
+    forms_eigenstrain_k = {
+        tag: fem.form(ufl.inner(ufl.dot(C, epsilon_sym(K_placeholder)), applied_eps_) * dx(tag))
+        for tag, C in stiffness_matrices.items()
+    }
+
+    # ── Forms for temporary_vector (eigenstrain) — static thermal/chemical ───
+    # These don't depend on K_solve or H_solve — only on Constants
+    # (alpha, delta_temp, eigenstrain_microscale, beta_current, beta_history).
+    # Updating those Constants' .value before assembly handles all variation.
+    forms_eigenstrain_static = {}
+    for tag, (E1, E2, E3, nu12, nu13, nu23, G12, G13, G23, alpha) in material_properties.items():
+        C = stiffness_matrices[tag]
+        if tag == 2:
+            forms_eigenstrain_static[tag] = fem.form(
+                ufl.inner(ufl.dot(C, epsilon_thermal(alpha, delta_temp) + eigenstrain_microscale),
+                          applied_eps_) * dx(tag))
+        elif tag == 3:
+            forms_eigenstrain_static[tag] = fem.form(
+                ufl.inner(ufl.dot(C, epsilon_thermal(alpha, delta_temp) + rotated_eigenstrain_microscale),
+                          applied_eps_) * dx(tag))
+        else:   # tag == 1 (matrix)
+            forms_eigenstrain_static[tag] = fem.form(
+                ufl.inner(ufl.dot(C, epsilon_thermal(alpha, delta_temp) + epsilon_volume(beta_current, beta_history)),
+                          applied_eps_) * dx(tag))
+
+    # Copy K_solve into placeholder once — it doesn't change during post-processing
+    K_placeholder.x.array[:] = K_solve.x.array[:]
+    K_placeholder.x.scatter_forward()
+
+
     ##==========================================================================##
     ##===  POST-PROCESSING: assemble homogenized stiffness tensor            ===##
     ##==========================================================================##
 
     temporary_tensor = np.zeros((dim_load, dim_load))
-    vol_inv  = 1.0 / unit_cell_volume
+    vol_inv   = 1.0 / unit_cell_volume
     j_allowed = {i: [j for j in range(dim_load)
                      if not (((i > 2) or (j > 2)) and (i != j))]
                  for i in range(dim_load)}
 
-    for i in trange(dim_load, colour="red", desc=f"Assembling C_hom ({scale})",
-                    position=1, leave=False,
-                    bar_format='{l_bar}{bar:30}{r_bar}', total=dim_load):
-    # for i in range(dim_load):
-        applied_eps.value = elementary_load[i]   # needed for P_tot_multiple_rhs evaluation
-        H_solve = H_solves[i]
+    # for i in trange(dim_load, colour="red", desc=f"Assembling C_hom ({scale})",
+    #                 position=1, leave=False,
+    #                 bar_format='{l_bar}{bar:30}{r_bar}', total=dim_load):
+    for i in range(dim_load):
+
+        # Update H_placeholder with solution for load case i — no recompilation
+        H_placeholder.x.array[:] = H_solves[i].x.array[:]
+        H_placeholder.x.scatter_forward()
+        applied_eps.value = elementary_load[i]
 
         for j in j_allowed[i]:
             applied_eps_.value = elementary_load[j]
-            for tag, C in stiffness_matrices.items():
-                temporary_tensor[i, j] += vol_inv * fem.assemble_scalar(
-                    fem.form(ufl.inner(P_tot_multiple_rhs(H_solve, C), applied_eps_) * dx(tag)))
+            for tag in stiffness_matrices:
+                temporary_tensor[i, j] += vol_inv * fem.assemble_scalar(forms_stiffness[tag])
 
     stiffness_tensor_homogenized.value = temporary_tensor
+
 
     ##==========================================================================##
     ##===  POST-PROCESSING: assemble homogenized eigenstrain                 ===##
@@ -304,30 +499,22 @@ def solve_unit_cell(scale, domain, cell_tags, material_state, mpc, bcs_disp, u_t
 
     temporary_vector = np.zeros(dim_load)
 
-    for tag, (E1, E2, E3, nu12, nu13, nu23, G12, G13, G23, alpha) in material_properties.items():
-        C = stiffness_matrices[tag]
+    for tag in material_properties:
         for j in range(dim_load):
             if j > 2:
                 continue
             applied_eps_.value = elementary_load[j]
-            if tag > 1:
-                temporary_vector[j] += fem.assemble_scalar(fem.form(
-                    ufl.inner(ufl.dot(C, epsilon_sym(K_solve)), applied_eps_) * dx(tag)))
-                if tag == 2:
-                    temporary_vector[j] -= fem.assemble_scalar(fem.form(
-                        ufl.inner(ufl.dot(C, epsilon_thermal(alpha, delta_temp) + eigenstrain_microscale), applied_eps_) * dx(tag)))
-                elif tag == 3:
-                    temporary_vector[j] -= fem.assemble_scalar(fem.form(
-                        ufl.inner(ufl.dot(C, epsilon_thermal(alpha, delta_temp) + rotated_eigenstrain_microscale), applied_eps_) * dx(tag)))
-            else:
-                temporary_vector[j] += fem.assemble_scalar(fem.form(
-                    ufl.inner(ufl.dot(C, epsilon_sym(K_solve)), applied_eps_) * dx(tag)))
-                temporary_vector[j] -= fem.assemble_scalar(fem.form(
-                    ufl.inner(ufl.dot(C, epsilon_thermal(alpha, delta_temp) + epsilon_volume(beta_current, beta_history)), applied_eps_) * dx(tag)))
 
-    eigenstrain_bar              = -(1 / unit_cell_volume) * np.linalg.inv(temporary_tensor) @ temporary_vector
+            # K_placeholder already holds K_solve values — just assemble
+            temporary_vector[j] += fem.assemble_scalar(forms_eigenstrain_k[tag])
+
+            # Static thermal/chemical term — Constants already hold correct values
+            temporary_vector[j] -= fem.assemble_scalar(forms_eigenstrain_static[tag])
+
+    eigenstrain_bar               = -(1 / unit_cell_volume) * np.linalg.inv(temporary_tensor) @ temporary_vector
     eigenstrain_homogenized.value = eigenstrain_bar
     beta_history.value           += float(beta_current)
+
 
     ##==========================================================================##
     ##===  CLEANUP                                                            ===##
