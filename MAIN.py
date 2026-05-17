@@ -315,10 +315,11 @@ mpc_meso, bcs_disp_meso = get_mpc(domain_meso)
 beta_history_meso = fem.Constant(domain_meso, 0.0)
 stiffness_tensor_homogenized_meso = fem.Constant(domain_meso, np.zeros((6, 6), dtype=default_scalar_type))
 eigenstrain_homogenized_meso      = fem.Constant(domain_meso, np.zeros(6, dtype=default_scalar_type))
+eigenstrain_homogenized_micro.value[0] = 0
 solve_unit_cell('meso', domain_meso, cell_tags_meso, material_state_meso, mpc_meso, bcs_disp_meso,
                 u_temp_prev, beta_history_meso, stiffness_tensor_homogenized_meso, eigenstrain_homogenized_meso, eigenstrain_homogenized_micro)
 
-# eigenstrain_homogenized_meso.value[0], eigenstrain_homogenized_meso.value[1] = 0, 0/
+eigenstrain_homogenized_meso.value[0], eigenstrain_homogenized_meso.value[1] = 0, 0
 stiffness_spatial, eig_spatial, S_stiffness, S_eig, angle_spatial = build_spatial_fields(
     domain,
     stiffness_tensor_homogenized_meso.value,
@@ -412,7 +413,7 @@ def P_tot(u, C):
 def P_eigenstrain(eig, C):
     return ufl.dot(C, eig)
 
-petsc_options={"ksp_type": "preonly", "pc_type": "lu"}
+petsc_options={"ksp_type": "gmres", "pc_type": "hypre", "pc_hypre_type": "boomeramg"}
 
 a_disp = ufl.inner(epsilon_sym(v_disp_current), P_tot(u_disp_current, stiffness_spatial)) * dx
 L_disp = ufl.inner(epsilon_sym(v_disp_current), P_eigenstrain(eig_spatial, stiffness_spatial)) * dx
@@ -592,10 +593,11 @@ for i in pbar:
                                 _G23=G23_tow
                             )
         material_state_meso.fiber = tow
+        eigenstrain_homogenized_micro.value[0] = 0
         solve_unit_cell('meso', domain_meso, cell_tags_meso, material_state_meso, mpc_meso, bcs_disp_meso,
                         u_temp_prev, beta_history_meso, stiffness_tensor_homogenized_meso, eigenstrain_homogenized_meso, eigenstrain_homogenized_micro)
         
-        # eigenstrain_homogenized_meso.value[0], eigenstrain_homogenized_meso.value[1] = 0, 0
+        eigenstrain_homogenized_meso.value[0], eigenstrain_homogenized_meso.value[1] = 0, 0
         update_spatial_fields(stiffness_spatial, eig_spatial, domain,
                               stiffness_tensor_homogenized_meso.value,
                               eigenstrain_homogenized_meso.value)
